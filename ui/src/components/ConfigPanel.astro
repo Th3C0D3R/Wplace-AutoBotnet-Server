@@ -1,0 +1,139 @@
+---
+// Static UI for inline Guard Config section
+---
+
+<div id="config-panel" class="bg-card border rounded-lg p-6 mt-6">
+  <h2 class="text-lg font-semibold mb-4 text-card-foreground">Config</h2>
+  <div id="config-disabled-hint" class="text-sm text-muted-foreground mb-3" style="display:none;">Conecta al menos un slave para configurar.</div>
+
+  <div class="space-y-5">
+    <!-- Protección / patrón -->
+    <div>
+      <label for="gc-protectionPattern" class="block text-sm font-medium mb-2 text-card-foreground">Patrón de protección</label>
+      <select id="gc-protectionPattern" class="w-full p-2 border rounded-md bg-background text-foreground">
+        <option value="random">random</option>
+        <option value="lineUp">lineUp</option>
+        <option value="lineDown">lineDown</option>
+        <option value="lineLeft">lineLeft</option>
+        <option value="lineRight">lineRight</option>
+        <option value="center">center</option>
+        <option value="borders">borders</option>
+        <option value="spiral">spiral</option>
+        <option value="zigzag">zigzag</option>
+        <option value="diagonal">diagonal</option>
+        <option value="cluster">cluster</option>
+        <option value="wave">wave</option>
+        <option value="corners">corners</option>
+        <option value="sweep">sweep</option>
+        <option value="priority">priority</option>
+        <option value="proximity">proximity</option>
+        <option value="quadrant">quadrant</option>
+        <option value="scattered">scattered</option>
+        <option value="snake">snake</option>
+        <option value="diagonalSweep">diagonalSweep</option>
+        <option value="spiralClockwise">spiralClockwise</option>
+        <option value="spiralCounterClockwise">spiralCounterClockwise</option>
+        <option value="biasedRandom">biasedRandom</option>
+        <option value="anchorPoints">anchorPoints</option>
+      </select>
+    </div>
+
+    <!-- Toggles principales -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div class="flex items-center justify-between">
+        <span class="text-sm text-card-foreground">Preferir color específico</span>
+        <label class="relative inline-flex w-9 h-5 items-center cursor-pointer select-none">
+          <input type="checkbox" id="gc-preferColor" class="opacity-0 absolute w-0 h-0" />
+          <span data-role="track" class="absolute inset-0 rounded-full transition-colors duration-300 bg-red-500"></span>
+          <span data-role="knob" class="absolute left-0.5 top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full transition-transform duration-300 translate-x-0"></span>
+        </label>
+      </div>
+      <div class="flex items-center justify-between">
+        <span class="text-sm text-card-foreground">Excluir colores específicos</span>
+        <label class="relative inline-flex w-9 h-5 items-center cursor-pointer select-none">
+          <input type="checkbox" id="gc-excludeColor" class="opacity-0 absolute w-0 h-0" />
+          <span data-role="track" class="absolute inset-0 rounded-full transition-colors duration-300 bg-red-500"></span>
+          <span data-role="knob" class="absolute left-0.5 top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full transition-transform duration-300 translate-x-0"></span>
+        </label>
+      </div>
+      <div class="flex items-center justify-between">
+        <span class="text-sm text-card-foreground">Usar tiempos aleatorios</span>
+        <label class="relative inline-flex w-9 h-5 items-center cursor-pointer select-none">
+          <input type="checkbox" id="gc-randomWaitTime" class="opacity-0 absolute w-0 h-0" />
+          <span data-role="track" class="absolute inset-0 rounded-full transition-colors duration-300 bg-red-500"></span>
+          <span data-role="knob" class="absolute left-0.5 top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full transition-transform duration-300 translate-x-0"></span>
+        </label>
+      </div>
+      <div class="flex items-center justify-between">
+        <span class="text-sm text-card-foreground">Gastar todos al iniciar</span>
+        <label class="relative inline-flex w-9 h-5 items-center cursor-pointer select-none">
+          <input type="checkbox" id="gc-spendAllPixelsOnStart" class="opacity-0 absolute w-0 h-0" />
+          <span data-role="track" class="absolute inset-0 rounded-full transition-colors duration-300 bg-red-500"></span>
+          <span data-role="knob" class="absolute left-0.5 top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full transition-transform duration-300 translate-x-0"></span>
+        </label>
+      </div>
+      <div class="flex items-center justify-between">
+        <span class="text-sm text-card-foreground">Modo Vigía</span>
+        <label class="relative inline-flex w-9 h-5 items-center cursor-pointer select-none">
+          <input type="checkbox" id="gc-watchMode" class="opacity-0 absolute w-0 h-0" />
+          <span data-role="track" class="absolute inset-0 rounded-full transition-colors duration-300 bg-red-500"></span>
+          <span data-role="knob" class="absolute left-0.5 top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full transition-transform duration-300 translate-x-0"></span>
+        </label>
+      </div>
+      <div class="flex items-center justify-between">
+        <span class="text-sm text-card-foreground">Auto-distribuir</span>
+        <label class="relative inline-flex w-9 h-5 items-center cursor-pointer select-none">
+          <input type="checkbox" id="gc-autoDistribute" class="opacity-0 absolute w-0 h-0" />
+          <span data-role="track" class="absolute inset-0 rounded-full transition-colors duration-300 bg-red-500"></span>
+          <span data-role="knob" class="absolute left-0.5 top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full transition-transform duration-300 translate-x-0"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Números -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium mb-2 text-card-foreground">Cargas mínimas para esperar</label>
+        <input type="number" id="gc-minChargesToWait" min="0" class="w-full p-2 border rounded-md bg-background text-foreground" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-2 text-card-foreground">Píxeles por lote</label>
+        <input type="number" id="gc-pixelsPerBatch" min="1" class="w-full p-2 border rounded-md bg-background text-foreground" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-2 text-card-foreground">Tiempo mínimo (s)</label>
+        <input type="number" id="gc-randomWaitMin" step="0.1" min="0" class="w-full p-2 border rounded-md bg-background text-foreground" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-2 text-card-foreground">Tiempo máximo (s)</label>
+        <input type="number" id="gc-randomWaitMax" step="0.1" min="0" class="w-full p-2 border rounded-md bg-background text-foreground" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-2 text-card-foreground">Umbral de color</label>
+        <input type="number" id="gc-colorThreshold" min="0" max="255" class="w-full p-2 border rounded-md bg-background text-foreground" />
+      </div>
+    </div>
+
+    <!-- Paletas -->
+    <div id="gc-preferredColors-section" style="display:none;">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-sm font-medium text-card-foreground">Preferidos</h3>
+        <button id="gc-clearPreferred" class="px-2 py-1 bg-red-500 text-white rounded text-xs" style="display:none;">Limpiar</button>
+      </div>
+      <div id="gc-preferredColors" class="flex flex-wrap gap-2"></div>
+    </div>
+    <div id="gc-excludedColors-section" style="display:none;">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-sm font-medium text-card-foreground">Excluidos</h3>
+        <button id="gc-clearExcluded" class="px-2 py-1 bg-red-500 text-white rounded text-xs" style="display:none;">Limpiar</button>
+      </div>
+      <div id="gc-excludedColors" class="flex flex-wrap gap-2"></div>
+    </div>
+
+    <!-- Footer -->
+    <div class="flex justify-end gap-2 pt-2">
+      <button id="gc-reset-btn" class="px-3 py-2 bg-gray-600 text-white rounded-md" title="Restablecer">�</button>
+    </div>
+    <div class="text-xs text-muted-foreground"><span id="gc-status"></span></div>
+  </div>
+</div>

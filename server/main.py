@@ -94,6 +94,52 @@ last_guard_upload: Optional[Dict[str, Any]] = None
 # Selección de slaves a nivel UI (persistente en memoria; usado como default cross-device)
 ui_selected_slaves: List[str] = []
 
+# Píxeles recientemente reparados (para evitar repintar mientras no llega preview fresco)
+RECENT_PREVIEW_TTL = 5  # considerar reparado durante 5 previews del favorito
+recently_repaired: Dict[str, int] = {}
+_recent_lock = Lock()
+
+def _mk_key(x: Any, y: Any) -> str:
+    try:
+        return f"{int(x)},{int(y)}"
+    except Exception:
+        return f"{x},{y}"
+
+def mark_recent_repairs(coords: List[Dict[str, Any]]):
+    if not coords:
+        return
+    with _recent_lock:
+        for p in coords:
+            k = _mk_key(p.get('x'), p.get('y'))
+            recently_repaired[k] = RECENT_PREVIEW_TTL
+
+def age_recent_repairs():
+    with _recent_lock:
+        to_del = []
+        for k, v in recently_repaired.items():
+            nv = int(v) - 1
+            if nv <= 0:
+                to_del.append(k)
+            else:
+                recently_repaired[k] = nv
+        for k in to_del:
+            try:
+                del recently_repaired[k]
+            except Exception:
+                pass
+
+def is_locked_change(change: Dict[str, Any]) -> bool:
+    # change es un dict con x,y
+    try:
+        x = change.get('x'); y = change.get('y')
+        if x is None or y is None:
+            return False
+        k = _mk_key(x, y)
+        with _recent_lock:
+            return bool(recently_repaired.get(k, 0) > 0)
+    except Exception:
+        return False
+
 # === DB (SQLite) setup ===
 DATABASE_URL = "sqlite:///./master.db"
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
@@ -830,6 +876,11 @@ async def start_session(session_id: str):
                         break
 
                 # Seleccionar los primeros N cambios a pintar (en orden)
+                # Primero, evitar repintar píxeles marcados como reparados recientemente
+                try:
+                    changes = [ch for ch in changes if not is_locked_change(ch)]
+                except Exception:
+                    pass
                 pick = min(len(changes), sum(plan.values()))
                 if pick <= 0:
                     await asyncio.sleep(5)
@@ -1029,6 +1080,11 @@ async def one_batch(session_id: str):
         return c.get('expectedColor', c.get('color', 0))
 
     changes = preview.get('changes', []) if isinstance(preview, dict) else []
+    # Evitar píxeles bloqueados por reparaciones recientes
+    try:
+        changes = [c for c in changes if not is_locked_change(c)]
+    except Exception:
+        pass
     # Missing + Absent + Incorrect
     changes = [c for c in changes if c.get('type') in ('missing', 'absent', 'incorrect')]
     # filtros de color
@@ -1233,6 +1289,11 @@ async def websocket_slave_endpoint(websocket: WebSocket):
                     if connected_slaves[slave_id].is_favorite:
                         # Persist preview_data inside telemetry so it's available on UI reload
                         preview_payload = message.get("data", {})
+                        # Cada preview del favorito envejece los bloqueos
+                        try:
+                            age_recent_repairs()
+                        except Exception:
+                            pass
                         try:
                             connected_slaves[slave_id].telemetry["preview_data"] = preview_payload
                             with _last_preview_lock:
@@ -1252,6 +1313,9 @@ async def websocket_slave_endpoint(websocket: WebSocket):
                                 setattr(manager, '_last_auto_distribute', now_ts)
                                 try:
                                     changes = preview_payload.get('changes', [])
+                                    # Filtrar los píxeles recientemente reparados (evitar duplicados)
+                                    if isinstance(changes, list) and changes:
+                                        changes = [c for c in changes if not is_locked_change(c)]
                                     if changes:
                                         # Filtrar a estructura pixels para distribución
                                         pixels = []
@@ -1349,6 +1413,12 @@ async def websocket_slave_endpoint(websocket: WebSocket):
                     coords = message.get('coords') or []  # opcional
                     if req_id:
                         batch_tracker.mark(req_id, slave_id, tX, tY, coords, bool(message.get('ok')))
+                    # Si la pintura fue OK, marcar coords como reparadas recientemente (TTL de previews)
+                    try:
+                        if bool(message.get('ok')) and coords:
+                            mark_recent_repairs(coords)
+                    except Exception:
+                        pass
                     await manager.broadcast_to_ui({
                         "type": "paint_result",
                         "slave_id": slave_id,
@@ -1397,12 +1467,59 @@ async def websocket_ui_endpoint(websocket: WebSocket):
                 })
         finally:
             db.close()
+
+        # Hydrate available colors for UI initial state
+        def _normalize_colors(arr):
+            out = []
+            try:
+                for i, c in enumerate(arr or []):
+                    if isinstance(c, dict):
+                        cid = c.get('id', i)
+                        r = int(c.get('r', 0))
+                        g = int(c.get('g', 0))
+                        b = int(c.get('b', 0))
+                        out.append({ 'id': cid, 'r': r, 'g': g, 'b': b })
+            except Exception:
+                pass
+            return out
+
+        initial_available_colors = []
+        # 1) Prefer colors from favorite's preview_data
+        try:
+            fav_id = next((sid for sid, s in connected_slaves.items() if getattr(s, 'is_favorite', False)), None)
+            if fav_id:
+                fav = connected_slaves.get(fav_id)
+                if fav and isinstance(fav.telemetry, dict):
+                    pd = fav.telemetry.get('preview_data') or {}
+                    initial_available_colors = _normalize_colors(pd.get('availableColors') or [])
+        except Exception:
+            initial_available_colors = []
+        # 2) If empty, search any slave's preview_data
+        if not initial_available_colors:
+            try:
+                for s in connected_slaves.values():
+                    if isinstance(s.telemetry, dict):
+                        pd = s.telemetry.get('preview_data') or {}
+                        colors = _normalize_colors(pd.get('availableColors') or [])
+                        if colors:
+                            initial_available_colors = colors
+                            break
+            except Exception:
+                pass
+        # 3) If still empty, try last guard upload (colors field)
+        if not initial_available_colors:
+            try:
+                if last_guard_upload and isinstance(last_guard_upload.get('data'), dict):
+                    initial_available_colors = _normalize_colors(last_guard_upload['data'].get('colors') or [])
+            except Exception:
+                pass
         await websocket.send_text(json.dumps({
             "type": "initial_state",
             "slaves": slaves_data,
             "projects": projects_list,
             "sessions": sessions_list,
-            "selected_slaves": list(ui_selected_slaves)
+            "selected_slaves": list(ui_selected_slaves),
+            "available_colors": initial_available_colors
         }))
         
         while True:
@@ -1492,9 +1609,16 @@ async def create_repair_orders(order: RepairOrder):
         raise HTTPException(status_code=400, detail="No available slaves for repair work")
     
     # Sort pixels by priority (high priority first)
-    high_priority = [p for p in order.pixels if p.get('priority') == 'high']
-    medium_priority = [p for p in order.pixels if p.get('priority') == 'medium']
-    low_priority = [p for p in order.pixels if p.get('priority') not in ['high', 'medium']]
+    # Además, filtrar píxeles recientemente reparados
+    def _not_locked(p):
+        try:
+            return not is_locked_change({'x': p.get('x'), 'y': p.get('y')})
+        except Exception:
+            return True
+    incoming = [p for p in order.pixels if _not_locked(p)]
+    high_priority = [p for p in incoming if p.get('priority') == 'high']
+    medium_priority = [p for p in incoming if p.get('priority') == 'medium']
+    low_priority = [p for p in incoming if p.get('priority') not in ['high', 'medium']]
     
     sorted_pixels = high_priority + medium_priority + low_priority
     

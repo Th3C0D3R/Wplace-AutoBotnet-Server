@@ -35,7 +35,7 @@
       // Animate in
       requestAnimationFrame(()=> node.classList.add('show'));
       // Progress bar
-      if (progress) {
+      if (progress && progress instanceof HTMLElement) {
         progress.style.transitionDuration = `${duration}ms`;
         progress.style.transform = 'scaleX(0)';
       }
@@ -45,11 +45,13 @@
       close && close.addEventListener('click', remove);
       setTimeout(remove, duration + 50);
     }
-    window.addEventListener('toast', (ev)=>{
-      const { message, variant, duration } = ev.detail || {};
+    window.addEventListener('toast', (ev: Event)=>{
+      const detail = (ev as CustomEvent).detail || {};
+      const { message, variant, duration } = detail;
       showToast(String(message||'Hecho'), String(variant||'info'), Number(duration||3000));
     });
     // Expose global helper
-    window.__toast = showToast;
+    // Declarar en runtime sin que TS falle
+    (window as any).__toast = showToast;
   })();
   </script>

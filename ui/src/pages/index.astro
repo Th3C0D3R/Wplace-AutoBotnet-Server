@@ -1,6 +1,12 @@
 ---
 // Main dashboard page
 import Toast from "../components/Toast.astro";
+import Header from "../components/Header.astro";
+import SlavesPanel from "../components/SlavesPanel.astro";
+import ConfigPanel from "../components/ConfigPanel.astro";
+import ControlPanel from "../components/ControlPanel.astro";
+import TelemetryPanel from "../components/TelemetryPanel.astro";
+import PreviewPanel from "../components/PreviewPanel.astro";
 ---
 
 <html lang="en">
@@ -56,236 +62,43 @@ import Toast from "../components/Toast.astro";
         --ring: 212.7 26.8% 83.9%;
       }
     </style>
+    <!-- Make flash animations global so they apply to dynamically-generated slave cards -->
+    <style is:global>
+      @keyframes card-flash-green {
+        0% { box-shadow: 0 0 0 0 rgba(16,185,129,0.0), 0 0 0 0 rgba(16,185,129,0.0) inset; }
+        20% { box-shadow: 0 0 0 3px rgba(16,185,129,0.9), 0 0 18px 2px rgba(16,185,129,0.6) inset; }
+        80% { box-shadow: 0 0 0 3px rgba(16,185,129,0.6), 0 0 12px 1px rgba(16,185,129,0.35) inset; }
+        100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.0), 0 0 0 0 rgba(16,185,129,0.0) inset; }
+      }
+      @keyframes card-flash-red {
+        0% { box-shadow: 0 0 0 0 rgba(239,68,68,0.0), 0 0 0 0 rgba(239,68,68,0.0) inset; }
+        20% { box-shadow: 0 0 0 3px rgba(239,68,68,0.9), 0 0 18px 2px rgba(239,68,68,0.6) inset; }
+        80% { box-shadow: 0 0 0 3px rgba(239,68,68,0.6), 0 0 12px 1px rgba(239,68,68,0.35) inset; }
+        100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.0), 0 0 0 0 rgba(239,68,68,0.0) inset; }
+      }
+      .flash-green { animation: card-flash-green 1.2s ease-out; }
+      .flash-red { animation: card-flash-red 1.2s ease-out; }
+    </style>
   </head>
   <body class="min-h-screen bg-background font-sans antialiased">
     <div id="app">
       <!-- Header -->
-      <header class="border-b">
-        <div class="container mx-auto px-4 py-4">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center space-x-4">
-              <h1 class="text-2xl font-bold text-foreground">WPlace Master</h1>
-              <span class="text-sm text-muted-foreground">Control Dashboard</span>
-            </div>
-            <div class="flex items-center space-x-2">
-              <div class="flex items-center space-x-2 text-sm text-muted-foreground">
-                <div class="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span>Server Online</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
+      <Header />
 
       <!-- Main Content -->
       <main class="container mx-auto px-4 py-8">
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <!-- Slaves Panel -->
-          <div class="lg:col-span-1">
-            <div class="bg-card border rounded-lg p-6">
-              <div class="flex items-center justify-between mb-4">
-                <h2 class="text-lg font-semibold text-card-foreground">Connected Slaves</h2>
-                <!-- Master toggle: activar/desactivar todos -->
-                <div class="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span>Toggle all</span>
-                  <label class="relative inline-flex w-9 h-5 items-center cursor-pointer select-none">
-                    <input type="checkbox" id="toggle-all-slaves" class="opacity-0 absolute w-0 h-0">
-                    <span data-role="track" class="absolute inset-0 rounded-full transition-colors duration-300 bg-red-500"></span>
-                    <span data-role="knob" class="absolute left-0.5 top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full transition-transform duration-300 translate-x-0"></span>
-                  </label>
-                </div>
-              </div>
-              <div id="slaves-list" class="space-y-3">
-                <div class="text-sm text-muted-foreground text-center py-8">
-                  No slaves connected. Inject Auto-Slave.js in your browser.
-                </div>
-              </div>
-              <div class="mt-4 text-xs text-muted-foreground">
-                <div>Last charge update: <span id="last-charge-update">Never</span></div>
-                <div>Next update in: <span id="next-update-countdown">--</span>s</div>
-              </div>
-
-              <!-- Activity Logs under Slaves with collapsible animation -->
-              <div class="mt-6">
-                <button id="logs-toggle" class="w-full flex items-center justify-between text-left text-sm text-card-foreground bg-muted/40 hover:bg-muted border rounded-md px-3 py-2 transition-colors">
-                  <span>Activity Logs</span>
-                  <span id="logs-caret" aria-hidden="true" class="transition-transform">▾</span>
-                </button>
-                <div id="logs-wrapper" class="overflow-hidden transition-[max-height] duration-300 ease-in-out" style="max-height: 220px;">
-                  <div id="logs-container" class="bg-muted rounded-md p-3 h-52 overflow-y-auto font-mono text-[11px]">
-                    <div class="text-muted-foreground">Waiting for activity...</div>
-                  </div>
-                </div>
-              </div>
-            </div>
+          <!-- Left column: Slaves + Config stacked -->
+          <div class="space-y-6 lg:col-span-1">
+            <SlavesPanel />
+            <ConfigPanel />
           </div>
 
-          <!-- Control Panel -->
+          <!-- Right side: Control, Telemetry, Preview -->
           <div class="lg:col-span-2">
-            <div class="bg-card border rounded-lg p-6">
-              <h2 class="text-lg font-semibold mb-4 text-card-foreground">Control Panel</h2>
-              
-              <!-- Project Configuration -->
-              <div class="space-y-4">
-                <div>
-                  <label class="block text-sm font-medium mb-2 text-card-foreground">Detected Bot Mode</label>
-                  <div id="detected-mode" class="w-full p-2 border rounded-md bg-muted text-muted-foreground">
-                    No file loaded - mode will be auto-detected
-                  </div>
-                </div>
-
-                <div>
-                  <label class="block text-sm font-medium mb-2 text-card-foreground">Project File</label>
-                  <input type="file" id="project-file" accept=".json" class="w-full p-2 border rounded-md bg-background text-foreground">
-                  <div id="file-status" class="mt-2 text-sm text-muted-foreground">No file selected</div>
-                  <div id="file-analysis" class="mt-1 text-xs text-blue-600" style="display: none;"></div>
-                </div>
-
-                <div>
-                  <label class="block text-sm font-medium mb-2 text-card-foreground">Charge Strategy</label>
-                  <select id="charge-strategy" class="w-full p-2 border rounded-md bg-background text-foreground">
-                    <option value="balanced">Balanced</option>
-                    <option value="drain">Drain One Slave</option>
-                    <option value="priority">Priority Based</option>
-                  </select>
-                </div>
-
-                <!-- Control Buttons -->
-                <div class="flex space-x-2 pt-4">
-                  <button id="start-btn" class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50" disabled>
-                    Start Session
-                  </button>
-                  <button id="pause-btn" class="px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/90 disabled:opacity-50" disabled>
-                    Pause
-                  </button>
-                  <button id="stop-btn" class="px-4 py-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 disabled:opacity-50" disabled>
-                    Stop
-                  </button>
-                  <button id="one-batch-btn" class="px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-500 disabled:opacity-50" disabled>
-                    🎯 Un lote
-                  </button>
-                  
-                  <button id="open-guard-config-btn" class="px-4 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-600">
-                    ⚙️ Guard Config (Server)
-                  </button>
-                  <button id="clear-project-btn" class="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600">
-                    🧹 Limpiar Proyecto
-                  </button>
-                </div>
-                <div class="pt-2 text-xs text-muted-foreground"><span id="guard-config-status"></span></div>
-              </div>
-            </div>
-
-            <!-- Telemetry Panel -->
-            <div class="bg-card border rounded-lg p-6 mt-6">
-              <h2 class="text-lg font-semibold mb-4 text-card-foreground">Real-time Telemetry</h2>
-        <div id="telemetry-grid" class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div class="text-center">
-                  <div class="text-2xl font-bold text-primary" id="repaired-pixels">0</div>
-                  <div class="text-sm text-muted-foreground">Repaired Pixels</div>
-                </div>
-                <div class="text-center">
-          <div class="text-2xl font-bold text-orange-500" id="incorrect-pixels">0</div>
-          <div class="text-sm text-muted-foreground">❌ Incorrectos</div>
-                </div>
-                <div class="text-center">
-          <div class="text-2xl font-bold text-red-500" id="missing-pixels">0</div>
-          <div class="text-sm text-muted-foreground">⚪ Faltantes</div>
-                </div>
-                <div class="text-center">
-                  <div class="text-2xl font-bold text-green-500" id="remaining-charges">0</div>
-                  <div class="text-sm text-muted-foreground">Remaining Charges</div>
-                </div>
-              </div>
-              <div class="mt-4">
-                <div class="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                  <span>Progress (latest preview)</span>
-                  <span id="overall-progress-label">0%</span>
-                </div>
-                <div class="w-full h-2 bg-muted rounded">
-                  <div id="overall-progress-bar" class="h-2 bg-emerald-500 rounded" style="width:0%"></div>
-                </div>
-              </div>
-            </div>
-
-            
-
-            <!-- Project Preview Section (integrated below telemetry) -->
-            <div id="preview-panel" class="bg-card border rounded-lg p-0 mt-6 w-full" style="display: none;">
-              <!-- Header -->
-              <div class="flex items-center justify-between p-4 bg-slate-800 rounded-t-lg border-b border-slate-600 select-none">
-                <h2 class="text-lg font-semibold text-card-foreground flex items-center gap-2">
-                  🔍 <span>Project Preview</span>
-                </h2>
-                <button id="close-preview" class="text-muted-foreground hover:text-foreground text-lg">✕</button>
-              </div>
-              
-              <!-- Main content -->
-              <div class="flex w-full" id="preview-content">
-                <!-- Left panel - Controls (minimized) -->
-                <div class="w-64 bg-slate-800 p-4 border-r border-slate-600 overflow-y-auto flex-shrink-0">
-                  <!-- Statistics -->
-                  <div class="bg-slate-700 rounded-lg p-3 mb-4">
-                    <h3 class="text-sm font-semibold text-blue-400 mb-2">📊 Estadísticas</h3>
-                    <div class="space-y-1 text-xs">
-                      <div class="flex justify-between">
-                        <span class="text-green-400">✅ Correctos:</span>
-                        <span id="preview-correct-count" class="font-bold">-</span>
-                      </div>
-                      <div class="flex justify-between">
-                        <span class="text-red-400">❌ Incorrectos:</span>
-                        <span id="preview-incorrect-count" class="font-bold">-</span>
-                      </div>
-                      <div class="flex justify-between">
-                        <span class="text-yellow-400">⚪ Faltantes:</span>
-                        <span id="preview-missing-count" class="font-bold">-</span>
-                      </div>
-                      <div class="flex justify-between">
-                        <span class="text-purple-400">🎯 Precisión:</span>
-                        <span id="preview-accuracy" class="font-bold">-</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Visualization Controls -->
-                  <div class="bg-slate-700 rounded-lg p-3 mb-4">
-                    <h3 class="text-sm font-semibold text-blue-400 mb-2">🎨 Visualización</h3>
-                    <div id="guard-preview-controls"></div>
-                    <div class="mt-3">
-                      <button id="one-batch-btn-preview" class="w-full px-2 py-1 text-xs bg-amber-600 hover:bg-amber-500 text-white rounded">🎯 Un lote ahora</button>
-                    </div>
-                  </div>
-
-                  <!-- Zoom Controls -->
-                  <div class="bg-slate-700 rounded-lg p-3">
-                    <h3 class="text-sm font-semibold text-blue-400 mb-2">🔍 Zoom</h3>
-                    <div class="space-y-2">
-                      <div class="flex items-center justify-between text-xs">
-                        <span>-</span>
-                        <input type="range" id="zoom-slider" min="0.5" max="5" step="0.1" value="1" class="flex-1 mx-2">
-                        <span>+</span>
-                      </div>
-                      <div class="text-center text-xs text-gray-400">
-                        <span id="zoom-level">100%</span>
-                      </div>
-                      <button id="fit-zoom" class="w-full px-2 py-1 text-xs bg-green-600 hover:bg-green-700 text-white rounded">
-                        📐 Ajustar Zoom
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                
-    <!-- Right panel - Canvas (maximized) -->
-  <div class="flex-1 bg-slate-900 relative">
-      <div class="w-full h-full overflow-auto p-2 md:p-3" id="canvas-container">
-                    <canvas id="preview-canvas" class="border border-slate-600" style="display:block;margin:0 auto;"></canvas>
-                  </div>
-                </div>
-              </div>
-              <!-- Resize handle -->
-              <div id="preview-resizer" class="h-3 bg-slate-800/70 hover:bg-slate-700 border-t border-slate-600 cursor-ns-resize rounded-b-lg"></div>
-            </div>
-
+            <ControlPanel />
+            <TelemetryPanel />
+            <PreviewPanel />
             <!-- (Logs moved under Connected Slaves) -->
           </div>
         </div>
@@ -318,6 +131,14 @@ import Toast from "../components/Toast.astro";
   _previewRefreshCooldownUntil: number;
   _selectedSlavesLocal: Set<string>;
   _selectedSlavesServer: Set<string>;
+  _preferredColorIds: Set<number>;
+  _excludedColorIds: Set<number>;
+  _configWired: boolean;
+  _saveTimer: any;
+  sessionStatus: 'running' | 'paused' | null;
+  _recentRepairs: Map<string, number>; // TTL por previews para no repintar
+  _recentTTL: number;
+  _flashTimers: Map<string, any>;
         constructor() {
           this.ws = null;
           this.slaves = new Map();
@@ -343,6 +164,14 @@ import Toast from "../components/Toast.astro";
             const saved = JSON.parse(localStorage.getItem('selectedSlaves') || '[]');
             this._selectedSlavesLocal = new Set(Array.isArray(saved) ? saved : []);
           } catch { this._selectedSlavesLocal = new Set(); }
+          this._preferredColorIds = new Set();
+          this._excludedColorIds = new Set();
+          this._configWired = false;
+          this._saveTimer = null;
+          this.sessionStatus = null;
+          this._recentRepairs = new Map();
+          this._recentTTL = 5; // considerar reparado durante 5 previews del favorito
+          this._flashTimers = new Map();
         }
 
         init() {
@@ -351,7 +180,11 @@ import Toast from "../components/Toast.astro";
           this.setupPreviewListeners();
           this.startChargeUpdateSystem();
     this.loadGuardConfig(); // Load guard configuration
+      this.setupConfigPanelListeners();
           this.restorePreviewPreferredHeight();
+          // Estado inicial de controles: sin slaves => deshabilitar botones dependientes
+          try { this.updateControlButtons(); } catch {}
+      try { this.updateConfigPanelEnabledState(); } catch {}
         }
 
   // Stubs (ya existían en versión previa del archivo, se redefinen si faltan)
@@ -478,6 +311,8 @@ import Toast from "../components/Toast.astro";
           
           this.ws.onopen = () => {
             this.log('✅ Connected to Master server via WebSocket');
+            // Solicitar un refresh de preview tras conectar
+            try { setTimeout(() => this.requestPreviewRefreshThrottle(), 250); } catch {}
           };
           
           this.ws.onmessage = (event) => {
@@ -512,12 +347,32 @@ import Toast from "../components/Toast.astro";
                 if (Array.isArray(message.selected_slaves)) {
                   this._selectedSlavesServer = new Set(message.selected_slaves);
                 }
+                // Rehidratar paleta de colores si el backend la envía
+                if (Array.isArray(message.available_colors) && message.available_colors.length > 0) {
+                  if (!this.lastPreviewData) this.lastPreviewData = {} as any;
+                  const hasPalette = Array.isArray((this.lastPreviewData as any).availableColors) && (this.lastPreviewData as any).availableColors.length > 0;
+                  if (!hasPalette) {
+                    (this.lastPreviewData as any).availableColors = message.available_colors;
+                    this.log('🎨 Paleta cargada desde initial_state');
+                    try { this.renderAllInlineChips(); } catch {}
+                  }
+                }
                 const fav = (message.slaves || []).find(s => s.is_favorite && s.telemetry && s.telemetry.preview_data);
                 if (fav) {
                   this.log(`🔁 Loading persisted preview from favorite slave ${fav.id}`);
+                  // Inferir modo a partir del preview
+                  try {
+                    const pd = fav.telemetry.preview_data;
+                    const looksGuard = !!(pd && (pd.protectedArea || pd.area || pd.correctPixelsList || pd.incorrectPixelsList || pd.missingPixelsList || pd.analysis));
+                    const looksImage = !!(pd && (pd.imageData && (pd.imageData.fullPixelData || (pd.imageData.width && pd.imageData.height))));
+                    if (looksGuard) this.detectedBotMode = 'Guard';
+                    else if (looksImage) this.detectedBotMode = 'Image';
+                    const detectedEl = document.getElementById('detected-mode'); if (detectedEl) detectedEl.textContent = this.detectedBotMode ? `Detected mode: ${this.detectedBotMode}` : 'No file loaded - mode will be auto-detected';
+                  } catch {}
                   this.updatePreviewFromSlave(fav.id, fav.telemetry.preview_data);
                   // Render directo en caso de saltar alguna ruta
                   this.renderGuardPreviewCanvas(fav.telemetry.preview_data);
+                  try { this.updateControlButtons(); } catch {}
                 }
                 // Rehidratar sesión/proyecto si existen en servidor
                 const sessions = Array.isArray(message.sessions) ? message.sessions : [];
@@ -528,6 +383,7 @@ import Toast from "../components/Toast.astro";
                 const sess = running || paused || sessions[0];
                 if (sess) {
                   this.currentSession = sess.id || sess.session_id || null;
+                  this.sessionStatus = (sess.status as any) || null;
                   this.log(`♻️ Rehydrated session: ${this.currentSession} (status=${sess.status||'unknown'})`);
                   // Preseleccionar slaves de la sesión
                   if (Array.isArray(sess.slave_ids)) {
@@ -542,12 +398,20 @@ import Toast from "../components/Toast.astro";
                   // Cargar proyecto asociado
                   const proj = projects.find(p => (p.id === sess.project_id));
                   if (proj) {
-                    this.detectedBotMode = proj.mode || null;
+                    // Normalizar modo
+                    const m = (proj.mode || '').toString().toLowerCase();
+                    this.detectedBotMode = m.startsWith('guard') ? 'Guard' : (m.startsWith('image') ? 'Image' : (proj.mode || null));
                     this.projectConfig = proj.config || null;
                     const detectedEl = document.getElementById('detected-mode'); if (detectedEl) detectedEl.textContent = this.detectedBotMode ? `Detected mode: ${this.detectedBotMode}` : 'No file loaded - mode will be auto-detected';
                     const statusEl = document.getElementById('file-status'); if (statusEl) statusEl.textContent = proj.name ? `Loaded from server: ${proj.name}` : 'Loaded from server';
                     // Mostrar preview panel si hay datos
                     const panel=document.getElementById('preview-panel'); if(panel){ panel.style.display='block'; }
+                    // Si es Guard y aún no hay preview en memoria, solicitarlo
+                    try {
+                      if ((this.detectedBotMode||'').toLowerCase().startsWith('guard') && !this.lastPreviewData) {
+                        this.requestPreviewRefreshThrottle();
+                      }
+                    } catch {}
                   }
                   // Botones según estado
                   const startBtn = document.getElementById('start-btn') as HTMLButtonElement | null;
@@ -565,8 +429,23 @@ import Toast from "../components/Toast.astro";
                     if (stopBtn) stopBtn.disabled = false;
                     if (oneBatchBtn) oneBatchBtn.disabled = false;
                   }
+                  // Re-evaluar con reglas de gating actuales
+                  try { this.updateControlButtons(); } catch {}
                 }
               } catch (e) { this.log('Error loading persisted preview: '+ e.message); }
+              // Si no hay favorito y estamos en Guard con slaves → autoasignar primero como favorito
+              try {
+                const anyFav = Array.from(this.slaves.values()).some((s:any) => s && s.is_favorite);
+                if (!anyFav && this.detectedBotMode && this.detectedBotMode.toLowerCase().startsWith('guard') && this.slaves.size > 0) {
+                  const first = Array.from(this.slaves.values())[0];
+                  if (first && first.id) {
+                    this.log(`⭐ No había favorito; autoasignando ${first.id}`);
+                    this.setFavoriteSlave(first.id).then(()=>{ try { this.requestPreviewRefreshThrottle(); } catch {} }).catch(()=>{});
+                  }
+                }
+              } catch {}
+              // Pedir refresh para reanudar flujo de preview tras recarga
+              try { this.requestPreviewRefreshThrottle(); } catch {}
               break;
             case 'slave_connected':
               this.log(`🤖 Slave connected: ${message.slave_id}`);
@@ -590,6 +469,24 @@ import Toast from "../components/Toast.astro";
             case 'telemetry_update':
               this.log(`📈 Telemetry from ${message.slave_id}: charges=${message.telemetry?.remaining_charges || 'N/A'}`);
               this.updateTelemetry(message.slave_id, message.telemetry);
+              try {
+                if (message.telemetry && message.telemetry.preview_data) {
+                  // Si viene preview del favorito, envejecer bloqueos
+                  try { const favId = this.getFavoriteSlaveId(); if (favId && favId === message.slave_id) this.ageRecentRepairs(); } catch {}
+                  // Renderizar preview si llega embebido en telemetría
+                  const pd = message.telemetry.preview_data;
+                  // Fijar modo si aún no está
+                  if (!this.detectedBotMode) {
+                    const looksGuard = !!(pd && (pd.protectedArea || pd.area || pd.correctPixelsList || pd.incorrectPixelsList || pd.missingPixelsList || pd.analysis));
+                    const looksImage = !!(pd && (pd.imageData && (pd.imageData.fullPixelData || (pd.imageData.width && pd.imageData.height))));
+                    if (looksGuard) this.detectedBotMode = 'Guard'; else if (looksImage) this.detectedBotMode = 'Image';
+                    const detectedEl = document.getElementById('detected-mode'); if (detectedEl) detectedEl.textContent = this.detectedBotMode ? `Detected mode: ${this.detectedBotMode}` : 'No file loaded - mode will be auto-detected';
+                  }
+                  this.updatePreviewFromSlave(message.slave_id, pd);
+                  this.recomputeRoundPlan();
+                  this.updateControlButtons();
+                }
+              } catch {}
               break;
             case 'status_update':
               this.log(`📊 Status update from ${message.slave_id}: ${message.status}`);
@@ -621,8 +518,11 @@ import Toast from "../components/Toast.astro";
                 if (message.data && message.data.analysis) {
                   this.logOnce('preview:summary', `📊 Preview analysis: ${message.data.analysis.correctPixels || 0} correct, ${message.data.analysis.incorrectPixels || 0} incorrect, ${message.data.analysis.missingPixels || 0} missing`, 3000);
                 }
+                // Envejecer bloqueos sólo si el preview viene del favorito
+                try { const favId = this.getFavoriteSlaveId(); if (favId && favId === message.slave_id) this.ageRecentRepairs(); } catch {}
                 this.updatePreviewFromSlave(message.slave_id, message.data);
                 this.recomputeRoundPlan();
+                try { this.updateControlButtons(); } catch {}
               }
               break;
             
@@ -639,9 +539,12 @@ import Toast from "../components/Toast.astro";
               try {
                 const favId = this.getFavoriteSlaveId();
                 if (this.awaitingOneBatchToast && favId && favId === message.slave_id) {
-                  const t = (window as any).__toast; if (t) t(`Lote completado por ${message.slave_id} (${message.completed})`, 'success', 3500);
+                  // Resalta la tarjeta del slave en verde en vez de toast
+                  this.highlightSlaveCard(String(message.slave_id), true);
                   this.awaitingOneBatchToast = false;
                 }
+                // También resaltar en verde al completar lote
+                this.highlightSlaveCard(String(message.slave_id), true);
               } catch {}
               this.requestPreviewRefreshThrottle();
               break;
@@ -657,11 +560,12 @@ import Toast from "../components/Toast.astro";
                 const msg = ok ? `✅ Pintado correcto (${message.painted || message.completed || 0})` : `❌ Pintado fallido: ${message.error || message.status || 'unknown'}`;
                 this.logOnce(`paint:res:${message.slave_id}:${ok}:${message.painted||message.completed||0}:${message.tileX},${message.tileY}`,
                   `[${message.slave_id}] ${msg}`, 6000);
+                // Resaltar tarjeta del slave en vez de toast
+                try { this.highlightSlaveCard(String(message.slave_id), !!ok); } catch {}
+                // Si ok y hay coords, marcar como reparados recientemente
                 try {
-                  const t = (window as any).__toast;
-                  if (t) {
-                    if (ok) t(`Pintado correcto: ${message.painted || message.completed || 0} px`, 'success', 2800);
-                    else t(`Error de pintado: ${message.error || message.status || 'unknown'}`, 'error', 3500);
+                  if (ok && Array.isArray(message.coords) && message.coords.length) {
+                    this.markRecentRepairs(message.coords);
                   }
                 } catch {}
                 this.requestPreviewRefreshThrottle();
@@ -670,7 +574,8 @@ import Toast from "../components/Toast.astro";
             
             case 'repair_error':
               this.logOnce(`err:${message.slave_id}:${message.error}`, `❌ Slave ${message.slave_id} repair error: ${message.error}`, 8000);
-              try { const t = (window as any).__toast; if (t) t(`Error de reparación: ${message.error}`, 'error', 4500); } catch {}
+              // Resaltar en rojo en vez de toast
+              try { this.highlightSlaveCard(String(message.slave_id), false); } catch {}
               break;
             
             case 'guard_config':
@@ -680,6 +585,14 @@ import Toast from "../components/Toast.astro";
                 if (message.config.autoDistribute !== undefined) {
                   this.autoDistribute = message.config.autoDistribute;
                 }
+                // Hidratar sets de colores y UI inline
+                try {
+                  this._preferredColorIds = new Set(Array.isArray(this.guardConfig?.preferredColorIds) ? this.guardConfig.preferredColorIds : []);
+                  this._excludedColorIds = new Set(Array.isArray(this.guardConfig?.excludedColorIds) ? this.guardConfig.excludedColorIds : []);
+                  this.applyGuardConfigToForm();
+                  this.ensureInlineSectionsVisibility();
+                  this.renderAllInlineChips();
+                } catch {}
                 try { this.recomputeRoundPlan(); } catch {}
               }
               break;
@@ -731,6 +644,13 @@ import Toast from "../components/Toast.astro";
                 No slaves connected. Inject Auto-Slave.js in your browser.
               </div>
             `;
+            // Deshabilitar acciones dependientes de slaves
+            try {
+              const oneBatchBtn = document.getElementById('one-batch-btn') as HTMLButtonElement | null; if (oneBatchBtn) oneBatchBtn.disabled = true;
+              const oneBatchBtnPreview = document.getElementById('one-batch-btn-preview') as HTMLButtonElement | null; if (oneBatchBtnPreview) oneBatchBtnPreview.disabled = true;
+              // legacy guard config button removed
+            } catch {}
+            try { this.updateConfigPanelEnabledState(); } catch {}
             return;
           }
 
@@ -840,6 +760,8 @@ import Toast from "../components/Toast.astro";
           this.updateControlButtons();
           // Recalcular cuotas después del render
           this.recomputeRoundPlan();
+          // Actualizar estado de panel de config
+          try { this.updateConfigPanelEnabledState(); } catch {}
         }
 
         async setFavoriteSlave(slaveId) {
@@ -932,15 +854,7 @@ import Toast from "../components/Toast.astro";
             oneBatchBtnPreview.addEventListener('click', () => this.sendOneBatch());
           }
           
-          
-          // Wire the new Guard Config button
-          const guardConfigBtn = document.getElementById('open-guard-config-btn');
-          if (guardConfigBtn) {
-            guardConfigBtn.addEventListener('click', async () => {
-              await this.loadGuardConfig();
-              this.openAdvancedGuardConfig();
-            });
-          }
+          // Modal legacy removed: no guard config button needed
           
           // Preview panel controls
           const closePreviewBtn = document.getElementById('close-preview');
@@ -1083,6 +997,7 @@ import Toast from "../components/Toast.astro";
             
             // Adjust preview size and auto-fit zoom after rendering
             setTimeout(() => { this.restorePreviewPreferredHeight(); this.adjustPreviewSize(); this.fitZoom(); }, 100);
+            try { this.updateControlButtons(); } catch {}
           }catch(e){ this.log('⚠️ Preview render error: '+e.message); }
         }
 
@@ -1102,6 +1017,7 @@ import Toast from "../components/Toast.astro";
               
               // Adjust preview size and auto-fit zoom after rendering
               setTimeout(() => { this.restorePreviewPreferredHeight(); this.adjustPreviewSize(); this.fitZoom(); }, 100);
+              try { this.updateControlButtons(); } catch {}
             }
           } catch(e){ this.log('⚠️ Guard preview error: '+e.message); }
         }
@@ -1389,6 +1305,13 @@ import Toast from "../components/Toast.astro";
         renderGuardPreviewCanvas(payload){
           try {
             if(!payload||!payload.analysis||!payload.area) return;
+            // Si aún no hay modo detectado, inferir Guard al renderizar este preview
+            if (!this.detectedBotMode) {
+              this.detectedBotMode = 'Guard';
+              const detectedEl = document.getElementById('detected-mode');
+              if (detectedEl) detectedEl.textContent = `Detected mode: ${this.detectedBotMode}`;
+              try { this.updateControlButtons(); } catch {}
+            }
             this.initGuardPreviewToggles();
             const panel=document.getElementById('preview-panel'); if(panel) panel.style.display='block';
             const area=payload.area;
@@ -1440,7 +1363,7 @@ import Toast from "../components/Toast.astro";
             const showIncorrect = showIncorrectEl ? showIncorrectEl.checked : this.guardPreview.show.incorrect;
             const showMissing = showMissingEl ? showMissingEl.checked : this.guardPreview.show.missing;
             
-            this.log(`�️ Display states - Correct: ${showCorrect}, Incorrect: ${showIncorrect}, Missing: ${showMissing}`);
+            this.log(`🎛️ Display states - Correct: ${showCorrect}, Incorrect: ${showIncorrect}, Missing: ${showMissing}`);
             
             // Función para dibujar píxel
             const drawPixel = (x, y, r, g, b, a = 255) => {
@@ -1457,214 +1380,132 @@ import Toast from "../components/Toast.astro";
             if (payload.analysis.originalPixels) {
               for (const [key, pixel] of payload.analysis.originalPixels) {
                 const [x, y] = key.split(',').map(Number);
-                drawPixel(x, y, pixel.r || 128, pixel.g || 128, pixel.b || 128, 255);
+                drawPixel(x, y, pixel?.r ?? 128, pixel?.g ?? 128, pixel?.b ?? 128, 255);
               }
             }
-            
+
             // Dibujar píxeles correctos (verde) si está habilitado
             if (showCorrect && payload.analysis.correct) {
-              for (const [key, _data] of payload.analysis.correct) {
+              for (const [key] of payload.analysis.correct) {
                 const [x, y] = key.split(',').map(Number);
-                drawPixel(x, y, 0, 255, 0, 180); // Verde semi-transparente
+                drawPixel(x, y, 0, 200, 0, 220);
               }
             }
-            
+
             // Dibujar píxeles incorrectos (rojo) si está habilitado
             if (showIncorrect && payload.analysis.incorrect) {
-              for (const [key, _data] of payload.analysis.incorrect) {
+              for (const [key] of payload.analysis.incorrect) {
                 const [x, y] = key.split(',').map(Number);
-                drawPixel(x, y, 255, 0, 0, 220); // Rojo más opaco
+                drawPixel(x, y, 220, 30, 30, 230);
               }
             }
-            
+
             // Dibujar píxeles faltantes (amarillo) si está habilitado
             if (showMissing && payload.analysis.missing) {
-              for (const [key, _pixel] of payload.analysis.missing) {
+              for (const [key] of payload.analysis.missing) {
                 const [x, y] = key.split(',').map(Number);
-                drawPixel(x, y, 255, 255, 0, 200); // Amarillo
+                drawPixel(x, y, 240, 210, 0, 220);
               }
             }
-            
-            // ¡CRÍTICO! Dibujar los píxeles en el canvas
+
+            // Volcar al canvas y ajustar tamaño/zoom
             ctx.putImageData(imageData, 0, 0);
-            this.log(`🎨 Canvas rendered successfully with ${correctCount + incorrectCount + missingCount} visible pixels`);
-            
-            // Actualizar estadísticas en panel principal también
-            this.updateGuardStatistics(payload.analysis);
-            
-            // Adjust preview size after rendering
-            setTimeout(() => this.adjustPreviewSize(), 50);
-            
-            // Actualizar estadísticas del canvas
-            let stats=document.getElementById('guard-preview-stats'); 
-            if(!stats){ 
-              stats=document.createElement('div'); 
-              stats.id='guard-preview-stats'; 
-              canvas.parentElement.appendChild(stats); 
-            }
-            const c=payload.analysis.correct?.size||0, i=payload.analysis.incorrect?.size||0, m=payload.analysis.missing?.size||0, tot=(payload.analysis.originalPixels?.size)||(c+i+m)||0, acc=tot?((c/tot)*100).toFixed(1):'0.0';
-            stats.innerHTML=`
-              <div style="margin-top:8px;padding:8px;background:#374151;border-radius:6px;font-size:12px;color:#e5e7eb;">
-                <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-                  <span style="color:#10b981;">✅ Correctos:</span><strong>${c}</strong>
-                </div>
-                <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-                  <span style="color:#ef4444;">❌ Incorrectos:</span><strong>${i}</strong>
-                </div>
-                <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-                  <span style="color:#f59e0b;">⚪ Faltantes:</span><strong>${m}</strong>
-                </div>
-                <div style="display:flex;justify-content:space-between;border-top:1px solid #4b5563;padding-top:4px;margin-top:4px;">
-                  <span style="color:#8b5cf6;">🎯 Precisión:</span><strong>${acc}%</strong>
-                </div>
-                <div style="font-size:10px;color:#9ca3af;text-align:center;margin-top:4px;">
-                  Canvas: ${width}x${height} | Total: ${tot}
-                </div>
-              </div>
-            `;
-            
+            try { this.updateGuardStatistics(payload.analysis); } catch {}
+            setTimeout(() => { this.restorePreviewPreferredHeight(); this.adjustPreviewSize(); this.fitZoom(); }, 50);
           } catch(err){ 
-            this.log('⚠️ renderGuardPreviewCanvas error: '+err.message); 
+            this.log('⚠️ renderGuardPreviewCanvas error: ' + err.message); 
             console.error('Canvas render error:', err, payload);
           }
         }
 
-        updateGuardStatistics(analysis) {
-          const correctCount = analysis.correct?.size || 0;
-          const incorrectCount = analysis.incorrect?.size || 0;  
-          const missingCount = analysis.missing?.size || 0;
-          const totalCount = analysis.originalPixels?.size || (correctCount + incorrectCount + missingCount);
-          const accuracy = totalCount > 0 ? ((correctCount / totalCount) * 100).toFixed(1) : '0.0';
-          
-          this.log(`📊 Updating statistics: C:${correctCount}, I:${incorrectCount}, M:${missingCount}, T:${totalCount}, A:${accuracy}%`);
-          
-          // Actualizar panel de telemetría en tiempo real con estadísticas de guard específicas
-          const rpEl = document.getElementById('repaired-pixels'); 
-          const incEl = document.getElementById('incorrect-pixels'); 
-          const missEl = document.getElementById('missing-pixels');
-          
-          if (rpEl) {
-            rpEl.textContent = String(correctCount);
-            this.log(`✅ Updated correctos: ${correctCount}`);
-          }
-          if (incEl) {
-            incEl.textContent = String(incorrectCount);
-            this.log(`❌ Updated incorrectos: ${incorrectCount}`);
-          }
-          if (missEl) {
-            missEl.textContent = String(missingCount);  
-            this.log(`⚪ Updated faltantes: ${missingCount}`);
-          }
-          
-          // Actualizar estadísticas del panel de preview
-          const previewCorrectEl = document.getElementById('preview-correct-count');
-          const previewIncorrectEl = document.getElementById('preview-incorrect-count');
-          const previewMissingEl = document.getElementById('preview-missing-count');
-          const previewAccuracyEl = document.getElementById('preview-accuracy');
-          
-          if (previewCorrectEl) previewCorrectEl.textContent = String(correctCount);
-          if (previewIncorrectEl) previewIncorrectEl.textContent = String(incorrectCount);
-          if (previewMissingEl) previewMissingEl.textContent = String(missingCount);
-          if (previewAccuracyEl) previewAccuracyEl.textContent = `${accuracy}%`;
-          // Nota: evitamos duplicar el log de 'faltantes'; ya se actualizó más arriba
-          
-          // Agregar indicador de precisión si no existe
-          let accuracyEl = document.getElementById('guard-accuracy');
-          if (!accuracyEl) {
-            const panel = document.querySelector('.grid.grid-cols-1.sm\\:grid-cols-4.gap-4');
-            if (panel && panel.children.length >= 3) {
-              const accuracyCard = document.createElement('div');
-              accuracyCard.className = 'bg-card text-card-foreground rounded-lg border p-4';
-              accuracyCard.innerHTML = `
-                <div class="text-sm font-medium text-muted-foreground">🎯 Precisión</div>
-                <div id="guard-accuracy" class="text-2xl font-bold">-</div>
-              `;
-              panel.appendChild(accuracyCard);
-              accuracyEl = document.getElementById('guard-accuracy');
-              this.log(`🎯 Created accuracy panel`);
-            }
-          }
-          if (accuracyEl) {
-            accuracyEl.textContent = `${accuracy}%`;
-            this.log(`🎯 Updated accuracy: ${accuracy}%`);
-          }
-          // Actualizar barra de progreso global en el panel de telemetría
-          this.updateOverallProgressBar(parseFloat(accuracy));
-        }
-
-        handleFileChange(e) {
+        // Manejo de carga de archivo de proyecto (Image o Guard)
+        handleFileChange(e){
           try {
-            const fileInput = e.target as HTMLInputElement;
+            const input = e?.target;
+            const file = input && input.files && input.files[0];
             const statusEl = document.getElementById('file-status');
             const detectedEl = document.getElementById('detected-mode');
-            const analysisEl = document.getElementById('file-analysis');
-            if (analysisEl) analysisEl.style.display = 'none';
-            if (!fileInput || !fileInput.files || !fileInput.files.length) {
-              this.projectConfig = null; this.detectedBotMode = null; if (statusEl) statusEl.textContent = 'No file selected'; if (detectedEl) detectedEl.textContent = 'No file loaded - mode will be auto-detected'; this.updateControlButtons(); return;
-            }
-            const file = fileInput.files[0];
-            if (statusEl) statusEl.textContent = `Reading ${file.name}...`;
+            if (!file) { if (statusEl) statusEl.textContent = 'No file selected'; return; }
+            if (statusEl) statusEl.textContent = 'Reading...';
             const reader = new FileReader();
-            reader.onload = () => {
-              let parsedOk=false; let mode='Image'; let json=null;
+            reader.onload = async () => {
               try {
-                const raw = reader.result as string;
-                json = JSON.parse(raw);
+                const text = String(reader.result || '');
+                const json = JSON.parse(text);
                 this.projectConfig = json;
-                mode = this.detectProjectMode(json, file.name);
+                const mode = this.detectProjectMode(json, file.name);
                 this.detectedBotMode = mode;
-                parsedOk=true;
-              } catch (err) {
-                this.projectConfig = null; this.detectedBotMode = null; if (detectedEl) detectedEl.textContent='Parse error'; if (statusEl) statusEl.textContent='Invalid JSON'; this.updateControlButtons(); this.log('❌ Error parsing file: '+ err.message);
-              }
-              if(!parsedOk) return; // no continuar a preview si JSON malo
-              if (detectedEl) detectedEl.textContent = `Detected mode: ${mode}`;
-              if (statusEl) statusEl.textContent = `Loaded ${file.name}`;
-              if (analysisEl && json) {
-                let info:string[]=[];
-                if (mode === 'Image') {
-                  if (json.imageData?.width && json.imageData?.height) info.push(`${json.imageData.width}x${json.imageData.height}`);
-                  if (Array.isArray(json.remainingPixels)) info.push(`remaining:${json.remainingPixels.length}`);
-                  if (Array.isArray(json.imageData?.fullPixelData)) info.push(`full:${json.imageData.fullPixelData.length}`);
-                } else if (mode === 'Guard') {
-                  const area = json.protectionData?.area || json.protectionArea;
-                  if (area) info.push(`area:(${area.x1},${area.y1})-(${area.x2},${area.y2})`);
-                  if (json.protectionData?.protectedPixels) info.push(`protected:${json.protectionData.protectedPixels}`);
-                  if (Array.isArray(json.originalPixels)) info.push(`pixels:${json.originalPixels.length}`);
-                }
-                analysisEl.textContent = info.length? info.join(' · '): 'No metadata';
-                analysisEl.style.display='block';
-              }
-              try {
-                if (mode === 'Image') this.showPreviewFromProject(json); 
-                else if (mode === 'Guard') this.showGuardPreviewFromProject(json); 
-                else this.hidePreviewPanel();
-                // NUEVO: si es Guard, enviar automáticamente al backend para que el slave favorito reconstruya estado
-                if (mode === 'Guard') {
-                  try {
+                if (detectedEl) detectedEl.textContent = mode ? `Detected mode: ${mode}` : 'Unknown mode';
+                if (statusEl) statusEl.textContent = `Loaded: ${file.name}`;
+                // Mostrar preview según modo
+                if (mode === 'Image') this.showPreviewFromProject(json);
+                else this.showGuardPreviewFromProject(json);
+                // Enviar guardData al favorito para rehidratar (si aplica)
+                try {
+                  if (mode === 'Guard') {
                     fetch(`${this.apiBase()}/api/guard/upload`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
+                      method: 'POST', headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ filename: file.name, data: json })
-                    }).then(r=>r.json()).then(resp=>{ this.log(`📤 Guard upload sent -> ${resp.sent_to||'n/a'} pixels=${json.originalPixels?.length||json.protectionData?.protectedPixels||0}`); }).catch(err=>{ this.log('❌ Guard upload error: '+err.message); });
-                  } catch (upErr) { this.log('❌ Guard upload exception: '+ upErr.message); }
-                }
-              } catch(preErr){ this.log('⚠️ Preview error (non-fatal): '+preErr.message); }
-              this.updateControlButtons();
-              this.log(`📄 Project file loaded (${file.name}) mode=${this.detectedBotMode}`);
+                    }).then(r=>r.json()).then(resp=>{
+                      this.log(`📤 Guard upload sent → fav=${resp.sent_to||'n/a'} pixels=${json?.originalPixels?.length||json?.protectionData?.protectedPixels||0}`);
+                    }).catch(err=>{ this.log('❌ Guard upload error: '+(err?.message||err)); });
+                  }
+                } catch(upErr){ this.log('⚠️ Upload exception: '+(upErr?.message||upErr)); }
+                this.updateControlButtons();
+              } catch (parseErr) {
+                if (statusEl) statusEl.textContent = 'Invalid JSON';
+                this.log('❌ JSON parse error: ' + (parseErr?.message || parseErr));
+              }
             };
             reader.onerror = () => { this.projectConfig = null; this.detectedBotMode = null; if (statusEl) statusEl.textContent='Read error'; this.updateControlButtons(); this.log('❌ File read error'); };
             reader.readAsText(file);
           } catch (ex) {
-            this.log('❌ Unexpected handleFileChange error: '+ ex.message);
+            this.log('❌ Unexpected handleFileChange error: '+ (ex?.message || ex));
           }
+        }
+
+        // Actualiza contadores básicos del panel de telemetría para Guard
+        updateGuardStatistics(analysis){
+          try {
+            const correctCount = analysis?.correct?.size || 0;
+            const incorrectCount = analysis?.incorrect?.size || 0;
+            const missingCount = analysis?.missing?.size || 0;
+            const rp = document.getElementById('repaired-pixels'); if (rp) rp.textContent = String(correctCount);
+            const inc = document.getElementById('incorrect-pixels'); if (inc) inc.textContent = String(incorrectCount);
+            const miss = document.getElementById('missing-pixels'); if (miss) miss.textContent = String(missingCount);
+            const total = (analysis?.originalPixels?.size || (correctCount + incorrectCount + missingCount));
+            const acc = total ? (correctCount/total*100) : 0;
+            this.updateOverallProgressBar(acc);
+          } catch {}
         }
 
         updateControlButtons() {
           const selectedSlaves = document.querySelectorAll<HTMLInputElement>('.slave-toggle:checked');
+          // Inferir modo si aún no está definido, a partir del estado disponible
+          if (!this.detectedBotMode) {
+            const looksGuard = !!(this.guardPreview?.analysis || (this.lastPreviewData && (this.lastPreviewData.correctPixelsList || this.lastPreviewData.incorrectPixelsList || this.lastPreviewData.missingPixelsList || this.lastPreviewData.analysis || this.lastPreviewData.protectedArea || this.lastPreviewData.area)));
+            const looksImage = !!(this.projectConfig?.imageData || (this.lastPreviewData && this.lastPreviewData.imageData));
+            if (looksGuard) this.detectedBotMode = 'Guard';
+            else if (looksImage) this.detectedBotMode = 'Image';
+            if (this.detectedBotMode) { const dm = document.getElementById('detected-mode'); if (dm) dm.textContent = `Detected mode: ${this.detectedBotMode}`; }
+          }
           const hasMode = this.detectedBotMode !== null;
-          
-          const canStart = selectedSlaves.length > 0 && hasMode;
+          const hasSelected = selectedSlaves.length > 0;
+          // Regla extra para Guard: requiere favorito y guard data cargado (preview u originalPixels)
+          let guardReady = true;
+          if (this.detectedBotMode === 'Guard') {
+            const favId = this.getFavoriteSlaveId();
+            const hasFav = !!favId;
+            // Permitimos empezar si hay config/proyecto cargado aunque aún no tengamos preview local; el favorito podrá solicitarlo
+            const hasProject = !!this.projectConfig;
+            const hasGuardData = !!(this.guardPreview?.analysis || (this.lastPreviewData && (this.lastPreviewData.originalPixels || this.lastPreviewData.analysis)));
+            guardReady = hasFav && (hasProject || hasGuardData);
+          }
+          // Si hay sesión corriendo, Start siempre deshabilitado
+          const isRunning = this.sessionStatus === 'running';
+          const isPaused = this.sessionStatus === 'paused';
+          const baseCanStart = hasSelected && hasMode && guardReady;
+          const canStart = !isRunning && baseCanStart; // en paused, permitimos Start si base ok
           const startBtn = document.getElementById('start-btn') as HTMLButtonElement | null; if (startBtn) startBtn.disabled = !canStart;
           
           // Enable distribute repairs button if there are connected slaves
@@ -1672,6 +1513,7 @@ import Toast from "../components/Toast.astro";
           const distBtn = document.getElementById('distribute-repairs-btn') as HTMLButtonElement | null; if (distBtn) distBtn.disabled = !hasSlaves;
           const oneBatchBtn = document.getElementById('one-batch-btn') as HTMLButtonElement | null; if (oneBatchBtn) oneBatchBtn.disabled = !hasSlaves;
           const oneBatchBtnPreview = document.getElementById('one-batch-btn-preview') as HTMLButtonElement | null; if (oneBatchBtnPreview) oneBatchBtnPreview.disabled = !hasSlaves;
+          // legacy guard config button removed
         }
 
   async startSession() {
@@ -1723,12 +1565,14 @@ import Toast from "../components/Toast.astro";
             const startJs = await startRes.json();
             const totalRem = startJs?.total_remaining ?? 0;
             this.log(`✅ Session started; total remaining charges: ${totalRem}`);
+            this.sessionStatus = 'running';
             try { const t = (window as any).__toast; if (t) t(`Sesión iniciada • Cargas totales: ${totalRem}`, 'info', 3000); } catch {}
             const rc = document.getElementById('remaining-charges'); if (rc) rc.textContent = String(totalRem);
             const pauseBtn = document.getElementById('pause-btn') as HTMLButtonElement | null; if (pauseBtn) pauseBtn.disabled = false;
             const stopBtn = document.getElementById('stop-btn') as HTMLButtonElement | null; if (stopBtn) stopBtn.disabled = false;
             const oneBatchBtn = document.getElementById('one-batch-btn') as HTMLButtonElement | null; if (oneBatchBtn) oneBatchBtn.disabled = false;
             const startBtn2 = document.getElementById('start-btn') as HTMLButtonElement | null; if (startBtn2) startBtn2.disabled = true;
+            try { this.updateControlButtons(); } catch {}
             
           } catch (error) {
             this.log(`❌ Error starting session: ${error}`);
@@ -1741,6 +1585,8 @@ import Toast from "../components/Toast.astro";
           try {
             await fetch(`${this.apiBase()}/api/sessions/${this.currentSession}/pause`, { method: 'POST' });
             this.log('Session paused');
+            this.sessionStatus = 'paused';
+            try { this.updateControlButtons(); } catch {}
           } catch (error) {
             this.log(`Error pausing session: ${error}`);
           }
@@ -1753,10 +1599,12 @@ import Toast from "../components/Toast.astro";
             await fetch(`${this.apiBase()}/api/sessions/${this.currentSession}/stop`, { method: 'POST' });
             this.log('Session stopped');
             this.currentSession = null;
+            this.sessionStatus = null;
             const startBtn3 = document.getElementById('start-btn') as HTMLButtonElement | null; if (startBtn3) startBtn3.disabled = false;
             const pauseBtn2 = document.getElementById('pause-btn') as HTMLButtonElement | null; if (pauseBtn2) pauseBtn2.disabled = true;
             const stopBtn2 = document.getElementById('stop-btn') as HTMLButtonElement | null; if (stopBtn2) stopBtn2.disabled = true;
             const oneBatchBtn = document.getElementById('one-batch-btn') as HTMLButtonElement | null; if (oneBatchBtn) oneBatchBtn.disabled = true;
+            try { this.updateControlButtons(); } catch {}
           } catch (error) {
             this.log(`Error stopping session: ${error}`);
           }
@@ -1805,9 +1653,19 @@ import Toast from "../components/Toast.astro";
               this.guardConfig = js.config || {};
               this.autoDistribute = !!(this.guardConfig as any)?.autoDistribute;
               if (st) st.textContent = 'Config loaded';
+              const st2 = document.getElementById('gc-status'); if (st2) st2.textContent = 'Config loaded';
               this.log('⚙️ Guard config loaded');
+              // Inicializar sets y reflejar en el formulario inline
+              try {
+                this._preferredColorIds = new Set(Array.isArray(this.guardConfig?.preferredColorIds) ? this.guardConfig.preferredColorIds : []);
+                this._excludedColorIds = new Set(Array.isArray(this.guardConfig?.excludedColorIds) ? this.guardConfig.excludedColorIds : []);
+                this.applyGuardConfigToForm();
+                this.ensureInlineSectionsVisibility();
+                this.renderAllInlineChips();
+              } catch {}
             } catch(e: any){
               if (st) st.textContent = 'Error loading config';
+              const st2 = document.getElementById('gc-status'); if (st2) st2.textContent = 'Error loading config';
               this.log('❌ Error loading guard config: '+ e?.message);
             }
           }
@@ -1861,62 +1719,185 @@ import Toast from "../components/Toast.astro";
             } catch(e){ this.log('❌ Error saving guard config: '+ e.message); }
           }
 
-          openAdvancedGuardConfig(){
-            if (document.getElementById('guardConfigOverlay')) { document.getElementById('guardConfigOverlay').style.display='flex'; return; }
-            const overlay = document.createElement('div');
-            overlay.id = 'guardConfigOverlay';
-            overlay.style.cssText = 'position:fixed;inset:0;display:flex;align-items:flex-start;justify-content:flex-start;padding:24px;z-index:6000;background:rgba(0,0,0,0.45);backdrop-filter:blur(3px);';
-            const win = document.createElement('div');
-            win.style.cssText = 'background:#1a1d23;color:#e2e8f0;width:560px;max-width:95vw;max-height:92vh;overflow:auto;border:2px solid #333;border-radius:14px;box-shadow:0 12px 34px rgba(0,0,0,0.55);font-family:Segoe UI,Roboto,sans-serif;display:flex;flex-direction:column;position:relative;';
-            win.innerHTML = `<div style="padding:14px 18px;background:#243041;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:10;"><h2 style="margin:0;font-size:15px;display:flex;align-items:center;gap:8px;">⚙️ Guard Config Avanzada</h2><button id='advClose' style='background:#3b4b5f;border:none;color:#ddd;padding:6px 10px;border-radius:6px;cursor:pointer;'>✕</button></div><div id='advBody' style='padding:16px;display:grid;grid-template-columns:1fr;gap:16px;'></div><div style='padding:12px 16px;background:#243041;display:flex;justify-content:flex-end;gap:10px;position:sticky;bottom:0;'><button id='advReset' style='background:#6b7280;border:none;color:#fff;padding:8px 14px;border-radius:6px;cursor:pointer;'>🔄 Reset</button><button id='advSave' style='background:#2563eb;border:none;color:#fff;padding:8px 14px;border-radius:6px;cursor:pointer;'>💾 Guardar</button></div>`;
-          overlay.appendChild(win); document.body.appendChild(overlay);
-          const body = win.querySelector('#advBody');
-          const block = (title, inner) => `<div style='background:#2d3748;padding:12px;border:1px solid #4a5568;border-radius:8px;'><h3 style='margin:0 0 10px;font-size:13px;color:#60a5fa;'>${title}</h3>${inner}</div>`;
-          body.innerHTML =
-            block('Patrón',`<select id='adv-protectionPattern' style='width:100%;padding:6px;background:#374151;border:1px solid #6b7280;color:#e5e7eb;border-radius:6px;'>${['random','lineUp','lineDown','lineLeft','lineRight','center','borders','spiral','zigzag','diagonal','cluster','wave','corners','sweep','priority','proximity','quadrant','scattered','snake','diagonalSweep','spiralClockwise','spiralCounterClockwise','biasedRandom','anchorPoints'].map(p=>`<option value="${p}">${p}</option>`).join('')}</select>`)
-            + block('Preferidos',`<label style='display:flex;align-items:center;gap:6px;font-size:12px;'><input type='checkbox' id='adv-preferColor'> preferColor</label><div id='adv-preferredColors' style='display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;'></div><button id='adv-clearPreferred' style='display:none;margin-top:6px;background:#ef4444;color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;'>Clear</button>`)
-            + block('Excluidos',`<label style='display:flex;align-items:center;gap:6px;font-size:12px;'><input type='checkbox' id='adv-excludeColor'> excludeColor</label><div id='adv-excludedColors' style='display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;'></div><button id='adv-clearExcluded' style='display:none;margin-top:6px;background:#ef4444;color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;'>Clear</button>`)
-            + block('Cargas & Lotes',`<label style='font-size:12px;'>minChargesToWait<input id='adv-minChargesToWait' type='number' min='0' style='width:100%;margin-top:4px;padding:6px;background:#374151;border:1px solid #6b7280;color:#e5e7eb;border-radius:6px;'></label><label style='font-size:12px;margin-top:8px;'>pixelsPerBatch<input id='adv-pixelsPerBatch' type='number' min='1' style='width:100%;margin-top:4px;padding:6px;background:#374151;border:1px solid #6b7280;color:#e5e7eb;border-radius:6px;'></label><label style='display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;'><input type='checkbox' id='adv-spendAllPixelsOnStart'> spendAllPixelsOnStart</label>`)
-            + block('Esperas Aleatorias',`<label style='display:flex;align-items:center;gap:6px;font-size:12px;'><input type='checkbox' id='adv-randomWaitTime'> randomWaitTime</label><div style='display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;'><div><span style='font-size:10px;'>Min (s)</span><input id='adv-randomWaitMin' type='number' step='0.1' min='0' style='width:100%;padding:6px;background:#374151;border:1px solid #6b7280;color:#e5e7eb;border-radius:6px;'></div><div><span style='font-size:10px;'>Max (s)</span><input id='adv-randomWaitMax' type='number' step='0.1' min='0' style='width:100%;padding:6px;background:#374151;border:1px solid #6b7280;color:#e5e7eb;border-radius:6px;'></div></div>`)
-            + block('Umbral & Modo',`<label style='font-size:12px;'>colorThreshold<input id='adv-colorThreshold' type='number' min='0' max='255' style='width:100%;margin-top:4px;padding:6px;background:#374151;border:1px solid #6b7280;color:#e5e7eb;border-radius:6px;'></label><label style='display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;'><input type='checkbox' id='adv-watchMode'> watchMode</label><label style='display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;'><input type='checkbox' id='adv-autoDistribute'> autoDistribute</label>`);
-          const cfg = this.guardConfig || {};
-          const setVal = (sel,val,type) => { const el = win.querySelector(sel); if (!el) return; if (type==='checkbox') el.checked = !!val; else if (val!==undefined) el.value = val; };
-          ['protectionPattern','preferColor','excludeColor','minChargesToWait','pixelsPerBatch','spendAllPixelsOnStart','randomWaitTime','randomWaitMin','randomWaitMax','colorThreshold','watchMode','autoDistribute'].forEach(k=>{
-            const idMap = {'protectionPattern':'#adv-protectionPattern','preferColor':'#adv-preferColor','excludeColor':'#adv-excludeColor','minChargesToWait':'#adv-minChargesToWait','pixelsPerBatch':'#adv-pixelsPerBatch','spendAllPixelsOnStart':'#adv-spendAllPixelsOnStart','randomWaitTime':'#adv-randomWaitTime','randomWaitMin':'#adv-randomWaitMin','randomWaitMax':'#adv-randomWaitMax','colorThreshold':'#adv-colorThreshold','watchMode':'#adv-watchMode','autoDistribute':'#adv-autoDistribute'}; const sel=idMap[k]; if(!sel) return; const type=['preferColor','excludeColor','spendAllPixelsOnStart','randomWaitTime','watchMode','autoDistribute'].includes(k)?'checkbox':undefined; setVal(sel,cfg[k],type); });
-          const preferred = new Set(cfg.preferredColorIds||[]);
-          const excluded = new Set(cfg.excludedColorIds||[]);
-          const colors = (this.lastPreviewData && this.lastPreviewData.availableColors) || [];
-          const renderChips = (wrapSel,set,clearSel) => { const wrap = win.querySelector(wrapSel); if(!wrap) return; wrap.innerHTML=''; setTimeout(()=>{ colors.forEach(c=>{ const chip=document.createElement('div'); chip.style.cssText=`width:26px;height:26px;border-radius:6px;cursor:pointer;border:2px solid ${set.has(c.id)?'#10b981':'transparent'};background:rgb(${c.r},${c.g},${c.b});`; chip.title=`Color ${c.id}`; chip.addEventListener('click',()=>{ if(set.has(c.id)) set.delete(c.id); else set.add(c.id); chip.style.borderColor=set.has(c.id)?'#10b981':'transparent'; updateClear(); }); wrap.appendChild(chip); }); updateClear(); },0); function updateClear(){ const btn=win.querySelector(clearSel); if(btn) btn.style.display=set.size>0?'block':'none'; }};
-          renderChips('#adv-preferredColors',preferred,'#adv-clearPreferred');
-          renderChips('#adv-excludedColors',excluded,'#adv-clearExcluded');
-          win.querySelector('#adv-clearPreferred')?.addEventListener('click',()=>{ preferred.clear(); renderChips('#adv-preferredColors',preferred,'#adv-clearPreferred'); });
-          win.querySelector('#adv-clearExcluded')?.addEventListener('click',()=>{ excluded.clear(); renderChips('#adv-excludedColors',excluded,'#adv-clearExcluded'); });
-          const close = () => overlay.style.display='none';
-          win.querySelector('#advClose').addEventListener('click', close);
-          overlay.addEventListener('click', e=>{ if(e.target===overlay) close(); });
-          (win.querySelector('#advSave') as any).addEventListener('click', async ()=>{
-            const payload = {
-              protectionPattern: (win.querySelector('#adv-protectionPattern') as any)?.value,
-              preferColor: (win.querySelector('#adv-preferColor') as any)?.checked,
-              excludeColor: (win.querySelector('#adv-excludeColor') as any)?.checked,
-              minChargesToWait: parseInt((win.querySelector('#adv-minChargesToWait') as any)?.value||'0',10),
-              pixelsPerBatch: parseInt((win.querySelector('#adv-pixelsPerBatch') as any)?.value||'1',10),
-              spendAllPixelsOnStart: (win.querySelector('#adv-spendAllPixelsOnStart') as any)?.checked,
-              randomWaitTime: (win.querySelector('#adv-randomWaitTime') as any)?.checked,
-              randomWaitMin: parseFloat((win.querySelector('#adv-randomWaitMin') as any)?.value||'0'),
-              randomWaitMax: parseFloat((win.querySelector('#adv-randomWaitMax') as any)?.value||'0'),
-              colorThreshold: parseInt((win.querySelector('#adv-colorThreshold') as any)?.value||'10',10),
-              watchMode: (win.querySelector('#adv-watchMode') as any)?.checked,
-              autoDistribute: (win.querySelector('#adv-autoDistribute') as any)?.checked,
-              preferredColorIds: Array.from(preferred),
-              excludedColorIds: Array.from(excluded)
-            } as any;
-            try { const r = await fetch(`${this.apiBase()}/api/guard/config`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); const j = await r.json(); if(j.ok){ this.guardConfig=j.config; this.applyGuardConfigToForm(); this.log('💾 Config avanzada guardada'); close(); } else { this.log('⚠️ Error guardando config avanzada'); } } catch(e){ this.log('❌ Error guardando avanzada: '+e.message); }
-          });
-          win.querySelector('#advReset').addEventListener('click', async ()=>{
-            if(!confirm('Reset to defaults?')) return; const defaults={protectionPattern:'random',preferColor:false,excludeColor:false,minChargesToWait:20,pixelsPerBatch:10,spendAllPixelsOnStart:false,randomWaitTime:false,randomWaitMin:5,randomWaitMax:15,colorThreshold:10,watchMode:true,autoDistribute:false,preferredColorIds:[],excludedColorIds:[]};
-            const r = await fetch(`${this.apiBase()}/api/guard/config`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(defaults)}); const j = await r.json(); if(j.ok){ this.guardConfig=j.config; this.applyGuardConfigToForm(); this.log('🔄 Config reseteada'); close(); }
-          });
+          // legacy modal removed
+
+        // ===== Inline Config Panel wiring =====
+        setupConfigPanelListeners(){
+          if (this._configWired) return; // evitar duplicados
+          const panel = document.getElementById('config-panel');
+          if (!panel) return; // componente no presente
+          this._configWired = true;
+
+          // Toggles: sincronizar visual y mostrar/ocultar secciones
+          const wireToggle = (id:string, sectionId?:string, onChange?:()=>void) => {
+            const el = document.getElementById(id) as HTMLInputElement | null;
+            if (!el) return;
+            // estado visual inicial
+            this.updateToggleState(id, el.checked);
+            if (sectionId) {
+              const sec = document.getElementById(sectionId);
+              if (sec) sec.style.display = el.checked ? '' : 'none';
+            }
+            el.addEventListener('change', () => {
+              this.updateToggleState(id, el.checked);
+              if (sectionId) {
+                const sec = document.getElementById(sectionId);
+                if (sec) sec.style.display = el.checked ? '' : 'none';
+                if (el.checked) {
+                  // Asegurar chips renderizados si se abre la sección
+                  this.renderAllInlineChips();
+                }
+              }
+              if (onChange) onChange();
+            });
+          };
+          wireToggle('gc-preferColor','gc-preferredColors-section');
+          wireToggle('gc-excludeColor','gc-excludedColors-section');
+          wireToggle('gc-spendAllPixelsOnStart', undefined, () => { try{ this.recomputeRoundPlan(); }catch{} });
+          wireToggle('gc-autoDistribute');
+          wireToggle('gc-watchMode');
+          wireToggle('gc-randomWaitTime');
+
+          // Botones guardar / reset
+          const resetBtn = document.getElementById('gc-reset-btn');
+          if (resetBtn) resetBtn.addEventListener('click', () => this.resetInlineGuardConfig());
+
+          // Autosave en inputs y selects (change/blur)
+          const panelRoot = document.getElementById('config-panel');
+          if (panelRoot) {
+            panelRoot.querySelectorAll('input, select').forEach((el:any) => {
+              el.addEventListener('change', () => this.scheduleConfigAutosave());
+              el.addEventListener('blur', () => this.scheduleConfigAutosave());
+            });
+          }
+
+          // Render inicial de chips si ya hay paleta
+          try { this.applyGuardConfigToForm(); this.ensureInlineSectionsVisibility(); this.renderAllInlineChips(); } catch {}
+        }
+
+        ensureInlineSectionsVisibility(){
+          const p = document.getElementById('gc-preferColor') as HTMLInputElement | null;
+          const e = document.getElementById('gc-excludeColor') as HTMLInputElement | null;
+          const ps = document.getElementById('gc-preferredColors-section'); if (ps) ps.style.display = p && p.checked ? '' : 'none';
+          const es = document.getElementById('gc-excludedColors-section'); if (es) es.style.display = e && e.checked ? '' : 'none';
+          if (p) this.updateToggleState('gc-preferColor', p.checked);
+          if (e) this.updateToggleState('gc-excludeColor', e.checked);
+        }
+
+        renderAllInlineChips(){
+          try {
+            const palette = (this.lastPreviewData && this.lastPreviewData.availableColors) || [];
+            if (!Array.isArray(palette) || palette.length === 0) return;
+            this.renderInlineColorChips('gc-preferredColors', palette, this._preferredColorIds, 'preferred');
+            this.renderInlineColorChips('gc-excludedColors', palette, this._excludedColorIds, 'excluded');
+          } catch {}
+        }
+
+        renderInlineColorChips(containerId:string, colors:any[], selected:Set<number>, mode:'preferred'|'excluded'){
+          try {
+            const container = document.getElementById(containerId); if (!container) return;
+            container.innerHTML = '';
+            const clearBtnId = (mode === 'preferred') ? 'gc-clearPreferred' : 'gc-clearExcluded';
+            const clearBtn = document.getElementById(clearBtnId);
+            const updateClear = () => { if (clearBtn) (clearBtn as HTMLButtonElement).style.display = selected.size > 0 ? '' : 'none'; };
+            // Wire clear button
+            if (clearBtn && !(clearBtn as any)._wired) {
+              (clearBtn as any)._wired = true;
+              clearBtn.addEventListener('click', () => { selected.clear(); this.renderInlineColorChips(containerId, colors, selected, mode); });
+            }
+            colors.forEach((c:any) => {
+              const chip = document.createElement('div');
+              chip.className = 'relative';
+              chip.style.cssText = `width:28px;height:28px;border-radius:6px;cursor:pointer;border:2px solid ${selected.has(c.id)?(mode==='preferred'?'#10b981':'#ef4444'):'transparent'};background:rgb(${c.r},${c.g},${c.b});`;
+              chip.title = `Color ${c.id}: RGB(${c.r},${c.g},${c.b})`;
+              const icon = document.createElement('div');
+              icon.style.cssText = `position:absolute;top:-3px;right:-3px;width:16px;height:16px;border-radius:50%;display:${selected.has(c.id)?'flex':'none'};align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:700;border:2px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,.3);background:${mode==='preferred'?'#10b981':'#ef4444'};`;
+              icon.textContent = mode === 'preferred' ? '✓' : '✕';
+              chip.appendChild(icon);
+              chip.addEventListener('click', () => {
+                if (selected.has(c.id)) { selected.delete(c.id); chip.style.borderColor = 'transparent'; icon.style.display = 'none'; }
+                else { selected.add(c.id); chip.style.borderColor = (mode==='preferred'?'#10b981':'#ef4444'); icon.style.display = 'flex'; }
+                updateClear();
+                this.scheduleConfigAutosave();
+              });
+              container.appendChild(chip);
+            });
+            updateClear();
+          } catch {}
+        }
+
+        scheduleConfigAutosave(delay:number=350){
+          try{
+            if (this._saveTimer) clearTimeout(this._saveTimer);
+            this._saveTimer = setTimeout(() => {
+              this._saveTimer = null;
+              this.saveInlineGuardConfig();
+            }, Math.max(0, delay));
+          }catch{}
+        }
+
+        updateConfigPanelEnabledState(){
+          const panel = document.getElementById('config-panel'); if (!panel) return;
+          const hint = document.getElementById('config-disabled-hint');
+          const enabled = this.slaves.size > 0;
+          const selectors = panel.querySelectorAll('input, select, button');
+          selectors.forEach((el:any) => { if (el.id !== 'gc-status') el.disabled = !enabled; });
+          if (hint) hint.style.display = enabled ? 'none' : '';
+          panel.style.opacity = enabled ? '1' : '0.6';
+        }
+
+        saveInlineGuardConfig(){
+          const payload:any = {};
+          const fields = [
+            ['gc-protectionPattern','protectionPattern','value'],
+            ['gc-preferColor','preferColor','checked'],
+            ['gc-excludeColor','excludeColor','checked'],
+            ['gc-spendAllPixelsOnStart','spendAllPixelsOnStart','checked'],
+            ['gc-randomWaitTime','randomWaitTime','checked'],
+            ['gc-watchMode','watchMode','checked'],
+            ['gc-autoDistribute','autoDistribute','checked'],
+            ['gc-minChargesToWait','minChargesToWait','value','int'],
+            ['gc-pixelsPerBatch','pixelsPerBatch','value','int'],
+            ['gc-randomWaitMin','randomWaitMin','value','float'],
+            ['gc-randomWaitMax','randomWaitMax','value','float'],
+            ['gc-colorThreshold','colorThreshold','value','int']
+          ];
+          fields.forEach(([id,key,prop,cast])=>{ const el:any=document.getElementById(id as string); if(!el) return; let v=el[prop as string]; if(cast==='int') v=parseInt(v,10); else if(cast==='float') v=parseFloat(v); (payload as any)[key as string]=v; });
+          // Añadir arrays de colores
+          payload.preferredColorIds = Array.from(this._preferredColorIds);
+          payload.excludedColorIds = Array.from(this._excludedColorIds);
+          const st = document.getElementById('gc-status'); if (st) st.textContent = 'Saving...';
+          fetch(`${this.apiBase()}/api/guard/config`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+            .then(r=>r.json())
+            .then(js=>{
+              if (js.ok) {
+                this.guardConfig = js.config || payload;
+                this.autoDistribute = !!this.guardConfig.autoDistribute;
+                if (st) st.textContent = 'Saved';
+                try { this.recomputeRoundPlan(); } catch {}
+              } else { if (st) st.textContent = 'Save failed'; }
+            })
+            .catch(e=>{ if (st) st.textContent = 'Error saving'; this.log('❌ Error saving config: '+(e?.message||e)); });
+        }
+
+        async resetInlineGuardConfig(){
+          if (!confirm('Reset to defaults?')) return;
+          const defaults={protectionPattern:'random',preferColor:false,excludeColor:false,minChargesToWait:20,pixelsPerBatch:10,spendAllPixelsOnStart:false,randomWaitTime:false,randomWaitMin:5,randomWaitMax:15,colorThreshold:10,watchMode:true,autoDistribute:false,preferredColorIds:[],excludedColorIds:[]};
+          const st = document.getElementById('gc-status'); if (st) st.textContent = 'Resetting...';
+          try{
+            const r = await fetch(`${this.apiBase()}/api/guard/config`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(defaults)});
+            const j = await r.json();
+            if (j.ok){
+              this.guardConfig = j.config;
+              this._preferredColorIds = new Set();
+              this._excludedColorIds = new Set();
+              this.applyGuardConfigToForm();
+              this.ensureInlineSectionsVisibility();
+              this.renderAllInlineChips();
+              if (st) st.textContent = 'Reset done';
+              this.log('🔄 Config reseteada');
+            } else { if (st) st.textContent = 'Reset failed'; }
+          } catch(e:any){ if (st) st.textContent = 'Error resetting'; this.log('❌ Reset error: '+(e?.message||e)); }
         }
         log(message: string) {
           const container = document.getElementById('logs-container');
@@ -1994,7 +1975,16 @@ import Toast from "../components/Toast.astro";
             }
             const changes = (this.lastPreviewData && Array.isArray(this.lastPreviewData.changes)) ? this.lastPreviewData.changes : [];
             const excluded = (this.guardConfig?.excludeColor && Array.isArray(this.guardConfig?.excludedColorIds)) ? new Set(this.guardConfig.excludedColorIds) : new Set();
-            const eligible = changes.filter(c => (c?.type === 'missing' || c?.type === 'absent') && !excluded.has(c?.expectedColor ?? c?.color ?? -1));
+            // Tratar incorrect igual que missing; filtrar bloqueados por TTL
+            const eligible = changes.filter(c => {
+              const t = c?.type;
+              if (!(t === 'missing' || t === 'absent' || t === 'incorrect')) return false;
+              const col = (c?.expectedColor ?? c?.color ?? -1);
+              if (excluded.has(col)) return false;
+              const k = (typeof c?.x !== 'undefined' && typeof c?.y !== 'undefined') ? `${c.x},${c.y}` : '';
+              if (k && this._recentRepairs.has(k) && (this._recentRepairs.get(k) || 0) > 0) return false;
+              return true;
+            });
             const maxAssignable = eligible.length;
             const planSum = Object.values(plan).reduce((a:any,b:any)=>a+b,0);
             let finalPlan = { ...plan } as any;
@@ -2012,6 +2002,48 @@ import Toast from "../components/Toast.astro";
             this.slaves.forEach((_, sid) => { if (!selectedIds.includes(sid)) this.updateSlaveCardQuota(sid, 0, 0); });
             this.currentRoundPlan = finalPlan;
           } catch(e){ this.log('⚠️ Recompute plan error: '+ (e?.message || e)); }
+        }
+
+        // ====== Bloqueo temporal de coords reparadas (TTL por previews favoritos) ======
+        markRecentRepairs(coords: Array<{x:number,y:number}>){
+          try{
+            coords.forEach(p=>{ if (typeof p?.x !== 'undefined' && typeof p?.y !== 'undefined') this._recentRepairs.set(`${p.x},${p.y}`, this._recentTTL); });
+          }catch{}
+        }
+        ageRecentRepairs(){
+          try{
+            const del: string[] = [];
+            this._recentRepairs.forEach((ttl, k) => {
+              const nv = (ttl||0) - 1;
+              if (nv <= 0) del.push(k); else this._recentRepairs.set(k, nv);
+            });
+            del.forEach(k => this._recentRepairs.delete(k));
+          }catch{}
+        }
+
+        // ====== Resaltado de tarjeta por slave (verde éxito / rojo error) ======
+        highlightSlaveCard(slaveId: string, success: boolean){
+          try {
+            const el = document.getElementById(`slave-${slaveId}`);
+            if (!el) return;
+            const add = success ? 'flash-green' : 'flash-red';
+            const remove = success ? 'flash-red' : 'flash-green';
+            // Limpiar animación opuesta
+            el.classList.remove(remove);
+            // Reiniciar si ya hay un timer
+            if (this._flashTimers.has(slaveId)) {
+              clearTimeout(this._flashTimers.get(slaveId));
+              this._flashTimers.delete(slaveId);
+            }
+            // Forzar reflow para reiniciar animación si misma clase
+            void (el as HTMLElement).offsetWidth;
+            el.classList.add(add);
+            const timer = setTimeout(() => {
+              try { el.classList.remove(add); } catch {}
+              this._flashTimers.delete(slaveId);
+            }, 1250);
+            this._flashTimers.set(slaveId, timer);
+          } catch {}
         }
 
         updateOverallProgressBar(accuracyPercentNumber:number){

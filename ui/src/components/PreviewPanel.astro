@@ -1,0 +1,78 @@
+---
+// Project Preview section with statistics, visualization toggles, zoom and canvas
+---
+
+<div id="preview-panel" class="bg-card border rounded-lg p-0 mt-6 w-full" style="display: none;">
+  <!-- Header -->
+  <div class="flex items-center justify-between p-4 bg-slate-800 rounded-t-lg border-b border-slate-600 select-none">
+    <h2 class="text-lg font-semibold text-card-foreground flex items-center gap-2">
+      🔍 <span>Project Preview</span>
+    </h2>
+    <button id="close-preview" class="text-muted-foreground hover:text-foreground text-lg">✕</button>
+  </div>
+  
+  <!-- Main content -->
+  <div class="flex w-full" id="preview-content">
+    <!-- Left panel - Controls (minimized) -->
+    <div class="w-64 bg-slate-800 p-4 border-r border-slate-600 overflow-y-auto flex-shrink-0">
+      <!-- Statistics -->
+      <div class="bg-slate-700 rounded-lg p-3 mb-4">
+        <h3 class="text-sm font-semibold text-blue-400 mb-2">📊 Estadísticas</h3>
+        <div class="space-y-1 text-xs">
+          <div class="flex justify-between">
+            <span class="text-green-400">✅ Correctos:</span>
+            <span id="preview-correct-count" class="font-bold">-</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-red-400">❌ Incorrectos:</span>
+            <span id="preview-incorrect-count" class="font-bold">-</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-yellow-400">⚪ Faltantes:</span>
+            <span id="preview-missing-count" class="font-bold">-</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-purple-400">🎯 Precisión:</span>
+            <span id="preview-accuracy" class="font-bold">-</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Visualization Controls -->
+      <div class="bg-slate-700 rounded-lg p-3 mb-4">
+        <h3 class="text-sm font-semibold text-blue-400 mb-2">🎨 Visualización</h3>
+        <div id="guard-preview-controls"></div>
+        <div class="mt-3">
+          <button id="one-batch-btn-preview" class="w-full px-2 py-1 text-xs bg-amber-600 hover:bg-amber-500 text-white rounded">🎯 Un lote ahora</button>
+        </div>
+      </div>
+
+      <!-- Zoom Controls -->
+      <div class="bg-slate-700 rounded-lg p-3">
+        <h3 class="text-sm font-semibold text-blue-400 mb-2">🔍 Zoom</h3>
+        <div class="space-y-2">
+          <div class="flex items-center justify-between text-xs">
+            <span>-</span>
+            <input type="range" id="zoom-slider" min="0.5" max="5" step="0.1" value="1" class="flex-1 mx-2">
+            <span>+</span>
+          </div>
+          <div class="text-center text-xs text-gray-400">
+            <span id="zoom-level">100%</span>
+          </div>
+          <button id="fit-zoom" class="w-full px-2 py-1 text-xs bg-green-600 hover:bg-green-700 text-white rounded">
+            📐 Ajustar Zoom
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Right panel - Canvas (maximized) -->
+    <div class="flex-1 bg-slate-900 relative">
+      <div class="w-full h-full overflow-auto p-2 md:p-3" id="canvas-container">
+        <canvas id="preview-canvas" class="border border-slate-600" style="display:block;margin:0 auto;"></canvas>
+      </div>
+    </div>
+  </div>
+  <!-- Resize handle -->
+  <div id="preview-resizer" class="h-3 bg-slate-800/70 hover:bg-slate-700 border-t border-slate-600 cursor-ns-resize rounded-b-lg"></div>
+</div>
