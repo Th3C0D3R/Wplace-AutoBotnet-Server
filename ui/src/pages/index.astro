@@ -1,0 +1,2043 @@
+---
+// Main dashboard page
+import Toast from "../components/Toast.astro";
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="generator" content={Astro.generator} />
+    <title>WPlace Master Dashboard</title>
+    <style>
+      :root {
+        --background: 0 0% 100%;
+        --foreground: 222.2 84% 4.9%;
+        --card: 0 0% 100%;
+        --card-foreground: 222.2 84% 4.9%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 222.2 84% 4.9%;
+        --primary: 222.2 47.4% 11.2%;
+        --primary-foreground: 210 40% 98%;
+        --secondary: 210 40% 96%;
+        --secondary-foreground: 222.2 84% 4.9%;
+        --muted: 210 40% 96%;
+        --muted-foreground: 215.4 16.3% 46.9%;
+        --accent: 210 40% 96%;
+        --accent-foreground: 222.2 84% 4.9%;
+        --destructive: 0 84.2% 60.2%;
+        --destructive-foreground: 210 40% 98%;
+        --border: 214.3 31.8% 91.4%;
+        --input: 214.3 31.8% 91.4%;
+        --ring: 222.2 84% 4.9%;
+        --radius: 0.5rem;
+      }
+      
+      .dark {
+        --background: 222.2 84% 4.9%;
+        --foreground: 210 40% 98%;
+        --card: 222.2 84% 4.9%;
+        --card-foreground: 210 40% 98%;
+        --popover: 222.2 84% 4.9%;
+        --popover-foreground: 210 40% 98%;
+        --primary: 210 40% 98%;
+        --primary-foreground: 222.2 47.4% 11.2%;
+        --secondary: 217.2 32.6% 17.5%;
+        --secondary-foreground: 210 40% 98%;
+        --muted: 217.2 32.6% 17.5%;
+        --muted-foreground: 215 20.2% 65.1%;
+        --accent: 217.2 32.6% 17.5%;
+        --accent-foreground: 210 40% 98%;
+        --destructive: 0 62.8% 30.6%;
+        --destructive-foreground: 210 40% 98%;
+        --border: 217.2 32.6% 17.5%;
+        --input: 217.2 32.6% 17.5%;
+        --ring: 212.7 26.8% 83.9%;
+      }
+    </style>
+  </head>
+  <body class="min-h-screen bg-background font-sans antialiased">
+    <div id="app">
+      <!-- Header -->
+      <header class="border-b">
+        <div class="container mx-auto px-4 py-4">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-4">
+              <h1 class="text-2xl font-bold text-foreground">WPlace Master</h1>
+              <span class="text-sm text-muted-foreground">Control Dashboard</span>
+            </div>
+            <div class="flex items-center space-x-2">
+              <div class="flex items-center space-x-2 text-sm text-muted-foreground">
+                <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+                <span>Server Online</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Main Content -->
+      <main class="container mx-auto px-4 py-8">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- Slaves Panel -->
+          <div class="lg:col-span-1">
+            <div class="bg-card border rounded-lg p-6">
+              <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-semibold text-card-foreground">Connected Slaves</h2>
+                <!-- Master toggle: activar/desactivar todos -->
+                <div class="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span>Toggle all</span>
+                  <label class="relative inline-flex w-9 h-5 items-center cursor-pointer select-none">
+                    <input type="checkbox" id="toggle-all-slaves" class="opacity-0 absolute w-0 h-0">
+                    <span data-role="track" class="absolute inset-0 rounded-full transition-colors duration-300 bg-red-500"></span>
+                    <span data-role="knob" class="absolute left-0.5 top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full transition-transform duration-300 translate-x-0"></span>
+                  </label>
+                </div>
+              </div>
+              <div id="slaves-list" class="space-y-3">
+                <div class="text-sm text-muted-foreground text-center py-8">
+                  No slaves connected. Inject Auto-Slave.js in your browser.
+                </div>
+              </div>
+              <div class="mt-4 text-xs text-muted-foreground">
+                <div>Last charge update: <span id="last-charge-update">Never</span></div>
+                <div>Next update in: <span id="next-update-countdown">--</span>s</div>
+              </div>
+
+              <!-- Activity Logs under Slaves with collapsible animation -->
+              <div class="mt-6">
+                <button id="logs-toggle" class="w-full flex items-center justify-between text-left text-sm text-card-foreground bg-muted/40 hover:bg-muted border rounded-md px-3 py-2 transition-colors">
+                  <span>Activity Logs</span>
+                  <span id="logs-caret" aria-hidden="true" class="transition-transform">▾</span>
+                </button>
+                <div id="logs-wrapper" class="overflow-hidden transition-[max-height] duration-300 ease-in-out" style="max-height: 220px;">
+                  <div id="logs-container" class="bg-muted rounded-md p-3 h-52 overflow-y-auto font-mono text-[11px]">
+                    <div class="text-muted-foreground">Waiting for activity...</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Control Panel -->
+          <div class="lg:col-span-2">
+            <div class="bg-card border rounded-lg p-6">
+              <h2 class="text-lg font-semibold mb-4 text-card-foreground">Control Panel</h2>
+              
+              <!-- Project Configuration -->
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-sm font-medium mb-2 text-card-foreground">Detected Bot Mode</label>
+                  <div id="detected-mode" class="w-full p-2 border rounded-md bg-muted text-muted-foreground">
+                    No file loaded - mode will be auto-detected
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium mb-2 text-card-foreground">Project File</label>
+                  <input type="file" id="project-file" accept=".json" class="w-full p-2 border rounded-md bg-background text-foreground">
+                  <div id="file-status" class="mt-2 text-sm text-muted-foreground">No file selected</div>
+                  <div id="file-analysis" class="mt-1 text-xs text-blue-600" style="display: none;"></div>
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium mb-2 text-card-foreground">Charge Strategy</label>
+                  <select id="charge-strategy" class="w-full p-2 border rounded-md bg-background text-foreground">
+                    <option value="balanced">Balanced</option>
+                    <option value="drain">Drain One Slave</option>
+                    <option value="priority">Priority Based</option>
+                  </select>
+                </div>
+
+                <!-- Control Buttons -->
+                <div class="flex space-x-2 pt-4">
+                  <button id="start-btn" class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50" disabled>
+                    Start Session
+                  </button>
+                  <button id="pause-btn" class="px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/90 disabled:opacity-50" disabled>
+                    Pause
+                  </button>
+                  <button id="stop-btn" class="px-4 py-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 disabled:opacity-50" disabled>
+                    Stop
+                  </button>
+                  <button id="one-batch-btn" class="px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-500 disabled:opacity-50" disabled>
+                    🎯 Un lote
+                  </button>
+                  
+                  <button id="open-guard-config-btn" class="px-4 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-600">
+                    ⚙️ Guard Config (Server)
+                  </button>
+                  <button id="clear-project-btn" class="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600">
+                    🧹 Limpiar Proyecto
+                  </button>
+                </div>
+                <div class="pt-2 text-xs text-muted-foreground"><span id="guard-config-status"></span></div>
+              </div>
+            </div>
+
+            <!-- Telemetry Panel -->
+            <div class="bg-card border rounded-lg p-6 mt-6">
+              <h2 class="text-lg font-semibold mb-4 text-card-foreground">Real-time Telemetry</h2>
+        <div id="telemetry-grid" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="text-center">
+                  <div class="text-2xl font-bold text-primary" id="repaired-pixels">0</div>
+                  <div class="text-sm text-muted-foreground">Repaired Pixels</div>
+                </div>
+                <div class="text-center">
+          <div class="text-2xl font-bold text-orange-500" id="incorrect-pixels">0</div>
+          <div class="text-sm text-muted-foreground">❌ Incorrectos</div>
+                </div>
+                <div class="text-center">
+          <div class="text-2xl font-bold text-red-500" id="missing-pixels">0</div>
+          <div class="text-sm text-muted-foreground">⚪ Faltantes</div>
+                </div>
+                <div class="text-center">
+                  <div class="text-2xl font-bold text-green-500" id="remaining-charges">0</div>
+                  <div class="text-sm text-muted-foreground">Remaining Charges</div>
+                </div>
+              </div>
+              <div class="mt-4">
+                <div class="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                  <span>Progress (latest preview)</span>
+                  <span id="overall-progress-label">0%</span>
+                </div>
+                <div class="w-full h-2 bg-muted rounded">
+                  <div id="overall-progress-bar" class="h-2 bg-emerald-500 rounded" style="width:0%"></div>
+                </div>
+              </div>
+            </div>
+
+            
+
+            <!-- Project Preview Section (integrated below telemetry) -->
+            <div id="preview-panel" class="bg-card border rounded-lg p-0 mt-6 w-full" style="display: none;">
+              <!-- Header -->
+              <div class="flex items-center justify-between p-4 bg-slate-800 rounded-t-lg border-b border-slate-600 select-none">
+                <h2 class="text-lg font-semibold text-card-foreground flex items-center gap-2">
+                  🔍 <span>Project Preview</span>
+                </h2>
+                <button id="close-preview" class="text-muted-foreground hover:text-foreground text-lg">✕</button>
+              </div>
+              
+              <!-- Main content -->
+              <div class="flex w-full" id="preview-content">
+                <!-- Left panel - Controls (minimized) -->
+                <div class="w-64 bg-slate-800 p-4 border-r border-slate-600 overflow-y-auto flex-shrink-0">
+                  <!-- Statistics -->
+                  <div class="bg-slate-700 rounded-lg p-3 mb-4">
+                    <h3 class="text-sm font-semibold text-blue-400 mb-2">📊 Estadísticas</h3>
+                    <div class="space-y-1 text-xs">
+                      <div class="flex justify-between">
+                        <span class="text-green-400">✅ Correctos:</span>
+                        <span id="preview-correct-count" class="font-bold">-</span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span class="text-red-400">❌ Incorrectos:</span>
+                        <span id="preview-incorrect-count" class="font-bold">-</span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span class="text-yellow-400">⚪ Faltantes:</span>
+                        <span id="preview-missing-count" class="font-bold">-</span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span class="text-purple-400">🎯 Precisión:</span>
+                        <span id="preview-accuracy" class="font-bold">-</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Visualization Controls -->
+                  <div class="bg-slate-700 rounded-lg p-3 mb-4">
+                    <h3 class="text-sm font-semibold text-blue-400 mb-2">🎨 Visualización</h3>
+                    <div id="guard-preview-controls"></div>
+                    <div class="mt-3">
+                      <button id="one-batch-btn-preview" class="w-full px-2 py-1 text-xs bg-amber-600 hover:bg-amber-500 text-white rounded">🎯 Un lote ahora</button>
+                    </div>
+                  </div>
+
+                  <!-- Zoom Controls -->
+                  <div class="bg-slate-700 rounded-lg p-3">
+                    <h3 class="text-sm font-semibold text-blue-400 mb-2">🔍 Zoom</h3>
+                    <div class="space-y-2">
+                      <div class="flex items-center justify-between text-xs">
+                        <span>-</span>
+                        <input type="range" id="zoom-slider" min="0.5" max="5" step="0.1" value="1" class="flex-1 mx-2">
+                        <span>+</span>
+                      </div>
+                      <div class="text-center text-xs text-gray-400">
+                        <span id="zoom-level">100%</span>
+                      </div>
+                      <button id="fit-zoom" class="w-full px-2 py-1 text-xs bg-green-600 hover:bg-green-700 text-white rounded">
+                        📐 Ajustar Zoom
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                
+    <!-- Right panel - Canvas (maximized) -->
+  <div class="flex-1 bg-slate-900 relative">
+      <div class="w-full h-full overflow-auto p-2 md:p-3" id="canvas-container">
+                    <canvas id="preview-canvas" class="border border-slate-600" style="display:block;margin:0 auto;"></canvas>
+                  </div>
+                </div>
+              </div>
+              <!-- Resize handle -->
+              <div id="preview-resizer" class="h-3 bg-slate-800/70 hover:bg-slate-700 border-t border-slate-600 cursor-ns-resize rounded-b-lg"></div>
+            </div>
+
+            <!-- (Logs moved under Connected Slaves) -->
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Toasts -->
+    <Toast />
+
+    <!-- Dashboard JavaScript -->
+    <script>
+      class WPlaceDashboard {
+        ws: WebSocket | null;
+        slaves: Map<string, any>;
+        currentSession: any;
+        chargeUpdateInterval: any;
+        chargeCountdown: number;
+        currentProject: any;
+        previewZoom: number;
+        detectedBotMode: string | null;
+        projectConfig: any;
+        guardConfig: any;
+        autoDistribute: boolean;
+        lastPreviewData: any; // added
+  guardPreview: any; // added preview state
+        lastPreviewAt: number; // throttle preview
+        recentLogKeys: Map<string, number>; // dedupe keys with TTL
+        awaitingOneBatchToast: boolean;
+  currentRoundPlan: Record<string, number>;
+  _previewRefreshCooldownUntil: number;
+  _selectedSlavesLocal: Set<string>;
+  _selectedSlavesServer: Set<string>;
+        constructor() {
+          this.ws = null;
+          this.slaves = new Map();
+    this.currentSession = null; // Initialize current session
+          this.chargeUpdateInterval = null;
+          this.chargeCountdown = 30;
+          this.currentProject = null;
+          this.previewZoom = 1;
+          this.detectedBotMode = null;
+          this.projectConfig = null;
+          this.guardConfig = {};
+          this.autoDistribute = false;
+          this.lastPreviewData = null; // init
+          this.guardPreview = { analysis:null, togglesInitialized:false, show:{correct:true, incorrect:true, missing:true}, area:null };
+          this.lastPreviewAt = 0;
+          this.recentLogKeys = new Map();
+          this.awaitingOneBatchToast = false;
+          this.currentRoundPlan = {};
+          this._previewRefreshCooldownUntil = 0;
+          this.init();
+          // Cargar selección local inicial
+          try {
+            const saved = JSON.parse(localStorage.getItem('selectedSlaves') || '[]');
+            this._selectedSlavesLocal = new Set(Array.isArray(saved) ? saved : []);
+          } catch { this._selectedSlavesLocal = new Set(); }
+        }
+
+        init() {
+          this.connectWebSocket();
+          this.setupEventListeners();
+          this.setupPreviewListeners();
+          this.startChargeUpdateSystem();
+    this.loadGuardConfig(); // Load guard configuration
+          this.restorePreviewPreferredHeight();
+        }
+
+  // Stubs (ya existían en versión previa del archivo, se redefinen si faltan)
+  setupPreviewListeners(){ /* placeholder legacy; mantiene zoom botones */ }
+  startChargeUpdateSystem(){ /* placeholder auto update charges si backend provee */ }
+
+        // Funciones de zoom para el preview (escalado por width/height, no por transform)
+        getMaxAllowedZoom() {
+          const canvas = document.getElementById('preview-canvas') as HTMLCanvasElement | null;
+          const container = document.getElementById('canvas-container') as HTMLElement | null;
+          if (!canvas || !container || !canvas.width || !canvas.height) return 1;
+          const cs = getComputedStyle(container);
+          const padX = parseFloat(cs.paddingLeft || '0') + parseFloat(cs.paddingRight || '0');
+          const padY = parseFloat(cs.paddingTop || '0') + parseFloat(cs.paddingBottom || '0');
+          const innerW = Math.max(0, container.clientWidth - padX);
+          const innerH = Math.max(0, container.clientHeight - padY);
+          const stats = document.getElementById('guard-preview-stats') as HTMLElement | null;
+          const statsH = stats ? stats.offsetHeight + 8 : 0;
+          const SAFE = 0.99;
+          const scaleX = innerW / canvas.width;
+          const scaleY = Math.max(0.1, (innerH - statsH) / canvas.height);
+          const cap = Math.max(0.1, Math.min(scaleX, scaleY)) * SAFE;
+          return isFinite(cap) && cap > 0 ? cap : 1;
+        }
+
+        setZoom(zoom) {
+          const canvas = document.getElementById('preview-canvas') as HTMLCanvasElement;
+          if (!canvas || !canvas.width || !canvas.height) return;
+          const maxAllowed = this.getMaxAllowedZoom();
+          const minAllowed = 0.5; // consistente con el slider
+          const clamped = Math.max(minAllowed, Math.min(zoom, maxAllowed));
+          this.previewZoom = clamped;
+          // Escalado real para que el layout conozca el tamaño y no recorte
+          canvas.style.width = `${Math.max(1, Math.round(canvas.width * clamped))}px`;
+          canvas.style.height = `${Math.max(1, Math.round(canvas.height * clamped))}px`;
+          // Sincronizar UI (slider y etiqueta)
+          const zoomSlider = document.getElementById('zoom-slider') as HTMLInputElement | null;
+          const zoomLevel = document.getElementById('zoom-level') as HTMLElement | null;
+          if (zoomSlider) zoomSlider.value = String(clamped);
+          if (zoomLevel) zoomLevel.textContent = `${Math.round(clamped * 100)}%`;
+        }
+
+  fitZoom() {
+          const canvas = document.getElementById('preview-canvas') as HTMLCanvasElement;
+          const container = document.getElementById('canvas-container');
+          if (!canvas || !container) return;
+
+          // Medidas internas útiles (restar paddings)
+          const cs = getComputedStyle(container);
+          const padX = parseFloat(cs.paddingLeft || '0') + parseFloat(cs.paddingRight || '0');
+          const padY = parseFloat(cs.paddingTop || '0') + parseFloat(cs.paddingBottom || '0');
+          const innerW = Math.max(0, container.clientWidth - padX);
+          const innerH = Math.max(0, container.clientHeight - padY);
+
+          // Reservar espacio para el bloque de estadísticas (si existe)
+          const stats = document.getElementById('guard-preview-stats');
+    const statsH = stats ? (stats as HTMLElement).offsetHeight + 8 : 0; // usar alto intrínseco del canvas
+
+          const scaleX = innerW / canvas.width;
+          const scaleY = Math.max(0.1, (innerH - statsH) / canvas.height);
+          // Permitir escalar por encima de 1 hasta 5x
+          // Margen de seguridad para evitar recortes por redondeos/bordes
+          const SAFE = 0.99;
+          const scale = Math.max(0.1, Math.min(scaleX, scaleY, 5)) * SAFE;
+
+          this.setZoom(scale);
+
+          // UI
+          const zoomSlider = document.getElementById('zoom-slider') as HTMLInputElement;
+          const zoomLevel = document.getElementById('zoom-level');
+          if (zoomSlider) zoomSlider.value = scale.toString();
+          if (zoomLevel) zoomLevel.textContent = `${Math.round(scale * 100)}%`;
+        }
+
+        adjustPreviewSize() {
+          const canvas = document.getElementById('preview-canvas') as HTMLCanvasElement | null;
+          const previewContent = document.getElementById('preview-content');
+          const panel = document.getElementById('preview-panel');
+          const container = document.getElementById('canvas-container');
+          if (!previewContent || !panel || panel.style.display === 'none') return;
+
+          // Límites seguros y cálculo de disponible
+          const MIN_H = 520;
+          const MAX_VH = 0.92; // usar más alto de la ventana
+          const B_MARGIN = 2; // minimizar margen inferior extra
+
+          const rect = previewContent.getBoundingClientRect();
+          const viewportCap = Math.floor(window.innerHeight * MAX_VH);
+          const availByViewport = Math.max(0, Math.floor(window.innerHeight - rect.top - B_MARGIN));
+
+          // Si el usuario ha elegido una altura preferida, respetarla (clamp a límites)
+          let savedH = 0;
+          try { savedH = parseInt(localStorage.getItem('previewPanel.height') || '0', 10) || 0; } catch {}
+          if (savedH > 0) {
+            const clamped = Math.max(MIN_H, Math.min(savedH, viewportCap, availByViewport));
+            previewContent.style.height = `${clamped}px`;
+            if (canvas && canvas.width > 0 && canvas.height > 0) setTimeout(() => this.fitZoom(), 0);
+            this.log(`📏 Preview height (user) ${clamped}px`);
+            return;
+          }
+
+          // Altura necesaria exacta según contenido visible
+          const stats = document.getElementById('guard-preview-stats');
+          const statsH = stats ? (stats as HTMLElement).offsetHeight : 0; // ya incluye paddings
+          const padY = container ? (() => { const cs = getComputedStyle(container); return (parseFloat(cs.paddingTop||'0') + parseFloat(cs.paddingBottom||'0')); })() : 0;
+          const canvasH = canvas ? canvas.offsetHeight : 0; // escalado efectivo
+          const needed = Math.ceil(canvasH + statsH + padY);
+
+          const finalH = Math.max(MIN_H, Math.min(needed, viewportCap, availByViewport));
+          previewContent.style.height = `${finalH}px`;
+
+          // Reajustar zoom a la nueva altura disponible
+          if (canvas && canvas.width > 0 && canvas.height > 0) setTimeout(() => this.fitZoom(), 0);
+
+          this.log(`📏 Preview height set to ${finalH}px (needed=${needed}, cap=${viewportCap}, avail=${availByViewport})`);
+        }
+
+        connectWebSocket() {
+          const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+          const wsUrl = `${protocol}//${window.location.hostname}:8008/ws/ui`;
+          
+          this.log(`🔌 Connecting to WebSocket: ${wsUrl}`);
+          this.ws = new WebSocket(wsUrl);
+          
+          this.ws.onopen = () => {
+            this.log('✅ Connected to Master server via WebSocket');
+          };
+          
+          this.ws.onmessage = (event) => {
+            try {
+              const message = JSON.parse(event.data);
+              this.logOnce(`ws:${message.type}`, `📨 Received WebSocket message: ${message.type}`, 1200);
+              this.handleWebSocketMessage(message);
+            } catch (error) {
+              this.log(`❌ Error parsing WebSocket message: ${error.message}`);
+            }
+          };
+          
+          this.ws.onclose = (event) => {
+            this.log(`🔌 WebSocket disconnected (code: ${event.code}, reason: ${event.reason || 'Unknown'})`);
+            this.log('🔄 Attempting to reconnect in 3 seconds...');
+            setTimeout(() => this.connectWebSocket(), 3000);
+          };
+          
+          this.ws.onerror = (error) => {
+            this.log(`❌ WebSocket error: ${error}`);
+          };
+        }
+
+        handleWebSocketMessage(message) {
+          this.logOnce(`proc:${message.type}`, `🔄 Processing message type: ${message.type}`, 1200);
+          
+          switch (message.type) {
+            case 'initial_state':
+              this.log(`📋 Initial state received with ${(message.slaves || []).length} slaves`);
+              this.updateSlavesList(message.slaves || []);
+              try {
+                if (Array.isArray(message.selected_slaves)) {
+                  this._selectedSlavesServer = new Set(message.selected_slaves);
+                }
+                const fav = (message.slaves || []).find(s => s.is_favorite && s.telemetry && s.telemetry.preview_data);
+                if (fav) {
+                  this.log(`🔁 Loading persisted preview from favorite slave ${fav.id}`);
+                  this.updatePreviewFromSlave(fav.id, fav.telemetry.preview_data);
+                  // Render directo en caso de saltar alguna ruta
+                  this.renderGuardPreviewCanvas(fav.telemetry.preview_data);
+                }
+                // Rehidratar sesión/proyecto si existen en servidor
+                const sessions = Array.isArray(message.sessions) ? message.sessions : [];
+                const projects = Array.isArray(message.projects) ? message.projects : [];
+                // Elegir sesión activa: preferir 'running', si no, 'paused'
+                const running = sessions.find(s => s.status === 'running');
+                const paused = sessions.find(s => s.status === 'paused');
+                const sess = running || paused || sessions[0];
+                if (sess) {
+                  this.currentSession = sess.id || sess.session_id || null;
+                  this.log(`♻️ Rehydrated session: ${this.currentSession} (status=${sess.status||'unknown'})`);
+                  // Preseleccionar slaves de la sesión
+                  if (Array.isArray(sess.slave_ids)) {
+                    setTimeout(() => {
+                      try {
+                        const ids = new Set(sess.slave_ids);
+                        document.querySelectorAll<HTMLInputElement>('.slave-toggle').forEach(cb => { cb.checked = ids.has(cb.value); this.updateToggleState(cb.id, cb.checked); });
+                        this.updateControlButtons();
+                      } catch {}
+                    }, 50);
+                  }
+                  // Cargar proyecto asociado
+                  const proj = projects.find(p => (p.id === sess.project_id));
+                  if (proj) {
+                    this.detectedBotMode = proj.mode || null;
+                    this.projectConfig = proj.config || null;
+                    const detectedEl = document.getElementById('detected-mode'); if (detectedEl) detectedEl.textContent = this.detectedBotMode ? `Detected mode: ${this.detectedBotMode}` : 'No file loaded - mode will be auto-detected';
+                    const statusEl = document.getElementById('file-status'); if (statusEl) statusEl.textContent = proj.name ? `Loaded from server: ${proj.name}` : 'Loaded from server';
+                    // Mostrar preview panel si hay datos
+                    const panel=document.getElementById('preview-panel'); if(panel){ panel.style.display='block'; }
+                  }
+                  // Botones según estado
+                  const startBtn = document.getElementById('start-btn') as HTMLButtonElement | null;
+                  const pauseBtn = document.getElementById('pause-btn') as HTMLButtonElement | null;
+                  const stopBtn = document.getElementById('stop-btn') as HTMLButtonElement | null;
+                  const oneBatchBtn = document.getElementById('one-batch-btn') as HTMLButtonElement | null;
+                  if (sess.status === 'running') {
+                    if (startBtn) startBtn.disabled = true;
+                    if (pauseBtn) pauseBtn.disabled = false;
+                    if (stopBtn) stopBtn.disabled = false;
+                    if (oneBatchBtn) oneBatchBtn.disabled = false;
+                  } else if (sess.status === 'paused') {
+                    if (startBtn) startBtn.disabled = false;
+                    if (pauseBtn) pauseBtn.disabled = true;
+                    if (stopBtn) stopBtn.disabled = false;
+                    if (oneBatchBtn) oneBatchBtn.disabled = false;
+                  }
+                }
+              } catch (e) { this.log('Error loading persisted preview: '+ e.message); }
+              break;
+            case 'slave_connected':
+              this.log(`🤖 Slave connected: ${message.slave_id}`);
+              this.refreshSlaves();
+              break;
+            case 'slave_reconnected':
+              this.log(`🔄 Slave reconnected: ${message.slave_id}`);
+              this.refreshSlaves();
+              break;
+            case 'slave_disconnected':
+              this.log(`🔌 Slave disconnected: ${message.slave_id}`);
+              this.slaves.delete(message.slave_id);
+              this.displaySlaves();
+              break;
+            case 'ui_selected_slaves':
+              if (Array.isArray(message.slave_ids)) {
+                this._selectedSlavesServer = new Set(message.slave_ids);
+                this.displaySlaves();
+              }
+              break;
+            case 'telemetry_update':
+              this.log(`📈 Telemetry from ${message.slave_id}: charges=${message.telemetry?.remaining_charges || 'N/A'}`);
+              this.updateTelemetry(message.slave_id, message.telemetry);
+              break;
+            case 'status_update':
+              this.log(`📊 Status update from ${message.slave_id}: ${message.status}`);
+              this.updateSlaveStatus(message.slave_id, message.status);
+              break;
+            case 'log':
+              this.log(`[${message.slave_id}] ${message.message}`);
+              break;
+            // NUEVO: evento de favorito desde el servidor para actualizar UI sin recargar
+            case 'slave_favorite':
+              this.log(`⭐ Slave ${message.slave_id} marked as favorite`);
+              this.slaves.forEach(s => { if (s) s.is_favorite = false; });
+              if (this.slaves.has(message.slave_id)) {
+                this.slaves.get(message.slave_id).is_favorite = true;
+              }
+              this.displaySlaves();
+              break;
+            // NUEVO: datos de preview del Fav-Slave
+            case 'preview_data':
+              {
+                const now = Date.now();
+                if (now - this.lastPreviewAt < 5000) {
+                  // Throttle preview updates to every 5s
+                  this.logOnce('throttle:preview', '⏱️ Preview update throttled', 3000);
+                  break;
+                }
+                this.lastPreviewAt = now;
+                this.log(`🖼️ Preview data from ${message.slave_id}: ${message.data ? 'Data received' : 'No data'}`);
+                if (message.data && message.data.analysis) {
+                  this.logOnce('preview:summary', `📊 Preview analysis: ${message.data.analysis.correctPixels || 0} correct, ${message.data.analysis.incorrectPixels || 0} incorrect, ${message.data.analysis.missingPixels || 0} missing`, 3000);
+                }
+                this.updatePreviewFromSlave(message.slave_id, message.data);
+                this.recomputeRoundPlan();
+              }
+              break;
+            
+            case 'repair_ack':
+              this.logOnce(`ack:${message.slave_id}:${message.total_repairs}`, `🔧 Slave ${message.slave_id} acknowledged repair order: ${message.total_repairs} pixels`, 5000);
+              break;
+            
+            case 'repair_progress':
+              this.logOnce(`prog:${message.slave_id}:${message.completed}/${message.total}`, `🎨 Slave ${message.slave_id} repair progress: ${message.completed}/${message.total} pixels`, 3500);
+              break;
+            
+            case 'repair_complete':
+              this.logOnce(`done:${message.slave_id}:${message.completed}`, `✅ Slave ${message.slave_id} completed repairs: ${message.completed} pixels`, 8000);
+              try {
+                const favId = this.getFavoriteSlaveId();
+                if (this.awaitingOneBatchToast && favId && favId === message.slave_id) {
+                  const t = (window as any).__toast; if (t) t(`Lote completado por ${message.slave_id} (${message.completed})`, 'success', 3500);
+                  this.awaitingOneBatchToast = false;
+                }
+              } catch {}
+              this.requestPreviewRefreshThrottle();
+              break;
+            
+            // NUEVO: eventos de pintado granular desde el slave
+            case 'paint_progress':
+              this.logOnce(`paint:prog:${message.slave_id}:${message.tileX},${message.tileY}:${message.completed}/${message.total}`,
+                `🎯 Paint progress ${message.completed}/${message.total} en tile ${message.tileX},${message.tileY} [${message.slave_id}]`, 3000);
+              break;
+            case 'paint_result':
+              {
+                const ok = message.ok ?? message.success ?? (message.status === 'ok');
+                const msg = ok ? `✅ Pintado correcto (${message.painted || message.completed || 0})` : `❌ Pintado fallido: ${message.error || message.status || 'unknown'}`;
+                this.logOnce(`paint:res:${message.slave_id}:${ok}:${message.painted||message.completed||0}:${message.tileX},${message.tileY}`,
+                  `[${message.slave_id}] ${msg}`, 6000);
+                try {
+                  const t = (window as any).__toast;
+                  if (t) {
+                    if (ok) t(`Pintado correcto: ${message.painted || message.completed || 0} px`, 'success', 2800);
+                    else t(`Error de pintado: ${message.error || message.status || 'unknown'}`, 'error', 3500);
+                  }
+                } catch {}
+                this.requestPreviewRefreshThrottle();
+              }
+              break;
+            
+            case 'repair_error':
+              this.logOnce(`err:${message.slave_id}:${message.error}`, `❌ Slave ${message.slave_id} repair error: ${message.error}`, 8000);
+              try { const t = (window as any).__toast; if (t) t(`Error de reparación: ${message.error}`, 'error', 4500); } catch {}
+              break;
+            
+            case 'guard_config':
+              this.log(`⚙️ Guard config received from server`);
+              if (message.config) {
+                this.guardConfig = message.config;
+                if (message.config.autoDistribute !== undefined) {
+                  this.autoDistribute = message.config.autoDistribute;
+                }
+                try { this.recomputeRoundPlan(); } catch {}
+              }
+              break;
+            case 'guard_cleared':
+              this.log(`🧹 Guard state cleared by server`);
+              // Reset preview and counters if it was cleared externally
+              try {
+                const panel = document.getElementById('preview-panel'); if (panel) panel.style.display='none';
+                const fileInput = document.getElementById('project-file') as HTMLInputElement | null; if (fileInput) fileInput.value = '';
+                const statusEl = document.getElementById('file-status'); if (statusEl) statusEl.textContent = 'No file selected';
+                const detectedEl = document.getElementById('detected-mode'); if (detectedEl) detectedEl.textContent = 'No file loaded - mode will be auto-detected';
+                this.projectConfig = null; this.detectedBotMode = null; this.lastPreviewData = null; this.guardPreview = { analysis:null, togglesInitialized:false, show:{correct:true, incorrect:true, missing:true}, area:null };
+                ['repaired-pixels','incorrect-pixels','missing-pixels'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent='0'; });
+                this.awaitingOneBatchToast = false;
+              } catch {}
+              break;
+            
+            default:
+              this.log(`❓ Unknown message type: ${message.type}`);
+              console.log('Full unknown message:', message);
+          }
+        }
+
+        async refreshSlaves() {
+          try {
+            const response = await fetch(`${this.apiBase()}/api/slaves`);
+            const data = await response.json();
+            this.updateSlavesList(data.slaves || []);
+          } catch (error) {
+            this.log(`Error fetching slaves: ${error}`);
+          }
+        }
+
+        updateSlavesList(slaves) {
+          this.slaves.clear();
+          slaves.forEach(slave => {
+            this.slaves.set(slave.id, slave);
+          });
+          this.displaySlaves();
+        }
+
+        displaySlaves() {
+          const container = document.getElementById('slaves-list');
+          if (!container) return;
+
+          if (this.slaves.size === 0) {
+            container.innerHTML = `
+              <div class="text-sm text-muted-foreground text-center py-8">
+                No slaves connected. Inject Auto-Slave.js in your browser.
+              </div>
+            `;
+            return;
+          }
+
+          const preselected = (id) => {
+            if (this._selectedSlavesLocal && this._selectedSlavesLocal.size > 0) return this._selectedSlavesLocal.has(id);
+            if (this._selectedSlavesServer && this._selectedSlavesServer.size > 0) return this._selectedSlavesServer.has(id);
+            return true;
+          };
+
+          container.innerHTML = Array.from(this.slaves.values()).map(slave => `
+            <div id="slave-${slave.id}" class="flex items-center justify-between p-3 border rounded-md">
+              <div>
+                <div class="font-medium text-sm flex items-center space-x-2">
+                  <span>${slave.id}</span>
+                  <button class="fav-btn" data-id="${slave.id}" title="Marcar como favorito">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="${slave.is_favorite ? '#f59e0b' : 'none'}" stroke="${slave.is_favorite ? '#f59e0b' : 'currentColor'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <polygon points="12 2 15 9 22 9 17 14 19 21 12 17 5 21 7 14 2 9 9 9 12 2" />
+                    </svg>
+                  </button>
+                </div>
+                <div class="text-xs text-muted-foreground">${slave.status || ''}</div>
+                <div class="text-xs text-muted-foreground">Charges: <span id="slave-${slave.id}-charges">${(slave.telemetry && typeof slave.telemetry.remaining_charges !== 'undefined') ? ((typeof slave.telemetry.max_charges !== 'undefined' && slave.telemetry.max_charges) ? `${slave.telemetry.remaining_charges}/${slave.telemetry.max_charges}` : slave.telemetry.remaining_charges) : '...'}</span></div>
+                <div class="text-[11px] text-muted-foreground mt-1">Quota next: <span id="slave-${slave.id}-quota">0</span></div>
+                <div class="w-40 h-1.5 bg-muted rounded mt-1"><div id="slave-${slave.id}-quota-bar" class="h-1.5 bg-blue-500 rounded" style="width:0%"></div></div>
+              </div>
+              <div class="flex items-center space-x-2">
+                <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+                <label class="relative inline-flex w-9 h-5 items-center cursor-pointer select-none">
+                  <input type="checkbox" class="slave-toggle opacity-0 absolute w-0 h-0" id="slave-toggle-${slave.id}" value="${slave.id}" ${preselected(slave.id) ? 'checked' : ''}>
+                  <span data-role="track" class="absolute inset-0 rounded-full transition-colors duration-300 bg-red-500"></span>
+                  <span data-role="knob" class="absolute left-0.5 top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full transition-transform duration-300 translate-x-0"></span>
+                </label>
+              </div>
+            </div>
+          `).join('');
+
+          // Marcar estilo destacado al favorito
+          const fav = Array.from(this.slaves.values()).find(s => s.is_favorite);
+          if (fav) {
+            const card = document.getElementById(`slave-${fav.id}`);
+            if (card) card.classList.add('ring-2','ring-amber-400');
+          }
+
+          // Listeners para estrella
+          container.querySelectorAll('.fav-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+              const target = e.currentTarget as HTMLElement;
+              const id = target.getAttribute('data-id');
+              if (id) this.setFavoriteSlave(id);
+            });
+          });
+
+          // Inicializar estado visual de toggles por slave
+          const persistSelection = () => {
+            try {
+              const selected = Array.from(container.querySelectorAll<HTMLInputElement>('.slave-toggle'))
+                .filter(cb => cb.checked).map(cb => cb.value);
+              localStorage.setItem('selectedSlaves', JSON.stringify(selected));
+              fetch(`${this.apiBase()}/api/ui/selected-slaves`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slave_ids: selected }) }).catch(()=>{});
+            } catch {}
+          };
+
+          container.querySelectorAll<HTMLInputElement>('.slave-toggle').forEach((input) => {
+            // Sincronizar estilos visuales
+            this.updateToggleState(input.id, input.checked);
+            input.addEventListener('change', () => {
+              this.updateToggleState(input.id, input.checked);
+              this.updateControlButtons();
+              this.recomputeRoundPlan();
+              persistSelection();
+              // Sincronizar toggle maestro (si alguno está off, maestro off)
+              const allToggles = Array.from(container.querySelectorAll<HTMLInputElement>('.slave-toggle'));
+              const allOn = allToggles.length > 0 && allToggles.every(t => t.checked);
+              const master = document.getElementById('toggle-all-slaves') as HTMLInputElement | null;
+              if (master) {
+                master.checked = allOn;
+                this.updateToggleState('toggle-all-slaves', allOn);
+              }
+            });
+          });
+
+          // Recalcular estado del toggle maestro post-render
+          const master = document.getElementById('toggle-all-slaves') as HTMLInputElement | null;
+          if (master) {
+            const allToggles = Array.from(container.querySelectorAll<HTMLInputElement>('.slave-toggle'));
+            const allOn = allToggles.length > 0 && allToggles.every(t => t.checked);
+            master.checked = allOn;
+            this.updateToggleState('toggle-all-slaves', allOn);
+            // Listener del maestro
+            const masterWrapper = master.parentElement as HTMLElement | null;
+            if (masterWrapper && !masterWrapper.getAttribute('data-wired')) {
+              masterWrapper.setAttribute('data-wired', '1');
+              master.addEventListener('change', () => {
+                const desired = master.checked;
+                allToggles.forEach(t => {
+                  t.checked = desired;
+                  this.updateToggleState(t.id, desired);
+                });
+                this.updateToggleState('toggle-all-slaves', desired);
+                this.updateControlButtons();
+                this.recomputeRoundPlan();
+                persistSelection();
+              });
+            }
+          }
+
+          this.updateControlButtons();
+          // Recalcular cuotas después del render
+          this.recomputeRoundPlan();
+        }
+
+        async setFavoriteSlave(slaveId) {
+          try {
+            await fetch(`${this.apiBase()}/api/slaves/${encodeURIComponent(slaveId)}/favorite`, { method: 'POST' });
+            this.log(`⭐ ${slaveId} marcado como favorito`);
+            await this.refreshSlaves();
+          } catch (e) {
+            this.log(`Error marcando favorito: ${e}`);
+          }
+        }
+
+        updateTelemetry(slaveId, telemetry) {
+          // Actualizar telemetría del slave
+          if (this.slaves.has(slaveId)) this.slaves.get(slaveId).telemetry = telemetry;
+
+          // Reagrupar métricas agregadas
+            let totalRepaired = 0, totalMissing = 0, totalAbsent = 0, totalCharges = 0;
+            let guardCorrect = 0, guardIncorrect = 0, guardMissing = 0;
+
+            this.slaves.forEach(slave => {
+              if (!slave.telemetry) return;
+              totalRepaired += slave.telemetry.repaired_pixels || 0;
+              totalMissing += slave.telemetry.missing_pixels || 0;
+              totalAbsent += slave.telemetry.absent_pixels || 0;
+              totalCharges += slave.telemetry.remaining_charges || 0;
+              // Métricas Guard si disponibles (del favorito)
+              guardCorrect += slave.telemetry.correctPixels || 0;
+              guardIncorrect += slave.telemetry.incorrectPixels || 0;
+              guardMissing += slave.telemetry.missingPixels || 0;
+              // Si preview_data trae análisis más reciente, sobreescribir acumulados (preferimos un solo dataset coherente)
+              if (slave.telemetry.preview_data && slave.telemetry.preview_data.analysis) {
+                const a = slave.telemetry.preview_data.analysis;
+                const c = a.correctPixels ?? a.correct;
+                const i = a.incorrectPixels ?? a.incorrect;
+                const m = a.missingPixels ?? a.missing;
+                if (typeof c === 'number' && typeof i === 'number' && typeof m === 'number') {
+                  guardCorrect = c; guardIncorrect = i; guardMissing = m;
+                }
+              }
+            });
+
+            // Actualizar panel realtime existente - usar métricas guard reales
+            const rp = document.getElementById('repaired-pixels'); if (rp) rp.textContent = String(guardCorrect);
+            const inc = document.getElementById('incorrect-pixels'); if (inc) inc.textContent = String(guardIncorrect);
+            const miss = document.getElementById('missing-pixels'); if (miss) miss.textContent = String(guardMissing);
+            const rc = document.getElementById('remaining-charges'); if (rc) rc.textContent = String(totalCharges);
+
+            this.updateSlaveCardCharges(slaveId);
+            try { this.recomputeRoundPlan(); } catch {}
+        }
+
+        updateSlaveCardCharges(slaveId) {
+          if (!this.slaves.has(slaveId)) return;
+          const slave = this.slaves.get(slaveId);
+          const el = document.getElementById(`slave-${slaveId}-charges`);
+          if (!el) return;
+          const rc = slave?.telemetry?.remaining_charges;
+          const mc = slave?.telemetry?.max_charges;
+          if (typeof rc === 'number') {
+            el.textContent = (typeof mc === 'number' && mc > 0) ? `${rc}/${mc}` : `${rc}`;
+          } else {
+            el.textContent = '...';
+          }
+          // Intentar actualizar barra de cuota si existe plan
+          try {
+            const val = this.currentRoundPlan?.[slaveId] || 0;
+            const cap = Math.max(1, Number(rc) || 0);
+            this.updateSlaveCardQuota(slaveId, val, cap ? (val / cap) : 0);
+          } catch {}
+        }
+
+        updateSlaveStatus(slaveId, status) {
+          if (this.slaves.has(slaveId)) {
+            this.slaves.get(slaveId).status = status;
+            this.displaySlaves();
+          }
+        }
+
+        setupEventListeners() {
+          document.getElementById('start-btn').addEventListener('click', () => this.startSession());
+          document.getElementById('pause-btn').addEventListener('click', () => this.pauseSession());
+          document.getElementById('stop-btn').addEventListener('click', () => this.stopSession());
+          const oneBatchBtn = document.getElementById('one-batch-btn');
+          if (oneBatchBtn) {
+            oneBatchBtn.addEventListener('click', () => this.sendOneBatch());
+          }
+          const oneBatchBtnPreview = document.getElementById('one-batch-btn-preview');
+          if (oneBatchBtnPreview) {
+            oneBatchBtnPreview.addEventListener('click', () => this.sendOneBatch());
+          }
+          
+          
+          // Wire the new Guard Config button
+          const guardConfigBtn = document.getElementById('open-guard-config-btn');
+          if (guardConfigBtn) {
+            guardConfigBtn.addEventListener('click', async () => {
+              await this.loadGuardConfig();
+              this.openAdvancedGuardConfig();
+            });
+          }
+          
+          // Preview panel controls
+          const closePreviewBtn = document.getElementById('close-preview');
+          if (closePreviewBtn) {
+            closePreviewBtn.addEventListener('click', () => this.hidePreviewPanel());
+          }
+          
+          const fitZoomBtn = document.getElementById('fit-zoom');
+          if (fitZoomBtn) {
+            fitZoomBtn.addEventListener('click', () => this.fitZoom());
+          }
+          
+          const zoomSlider = document.getElementById('zoom-slider');
+          const zoomLevel = document.getElementById('zoom-level');
+          if (zoomSlider && zoomLevel) {
+            zoomSlider.addEventListener('input', (e) => {
+              const desired = parseFloat((e.target as HTMLInputElement).value);
+              this.setZoom(desired); // setZoom ya clampa y sincroniza UI
+            });
+          }
+          
+          // File input change handler for auto-detection
+          document.getElementById('project-file').addEventListener('change', (e) => this.handleFileChange(e));
+
+          // Clear project
+          const clearBtn = document.getElementById('clear-project-btn');
+          if (clearBtn) clearBtn.addEventListener('click', () => this.clearProject());
+
+          // Resizer events
+          const resizer = document.getElementById('preview-resizer');
+          if (resizer) {
+            let isResizing = false; let startY = 0; let startH = 0;
+            resizer.addEventListener('mousedown', (e) => {
+              const content = document.getElementById('preview-content') as HTMLElement | null;
+              if (!content) return;
+              isResizing = true; startY = e.clientY; startH = content.offsetHeight;
+              document.body.style.cursor = 'ns-resize';
+              document.addEventListener('mousemove', onMove);
+              document.addEventListener('mouseup', onUp);
+            });
+            const onMove = (e: MouseEvent) => {
+              if (!isResizing) return; const content = document.getElementById('preview-content') as HTMLElement | null; if (!content) return;
+              const delta = e.clientY - startY; const next = Math.max(520, Math.min(window.innerHeight * 0.95, startH + delta));
+              content.style.height = `${Math.round(next)}px`;
+              this.persistPreviewPreferredHeight(Math.round(next));
+              this.fitZoom();
+            };
+            const onUp = () => { if (!isResizing) return; isResizing = false; document.body.style.cursor = 'default'; document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
+          }
+          
+          // Window resize handler for preview
+          window.addEventListener('resize', () => {
+            const previewPanel = document.getElementById('preview-panel');
+            if (previewPanel && previewPanel.style.display !== 'none') {
+              this.adjustPreviewSize();
+            }
+          });
+
+          // Logs collapsible toggle
+          const logsToggle = document.getElementById('logs-toggle');
+          const logsCaret = document.getElementById('logs-caret');
+          const logsWrapper = document.getElementById('logs-wrapper');
+          if (logsToggle && logsCaret && logsWrapper) {
+            logsToggle.addEventListener('click', () => {
+              const open = logsWrapper.style.maxHeight && parseInt(logsWrapper.style.maxHeight) > 0;
+              if (open) {
+                logsWrapper.style.maxHeight = '0px';
+                logsCaret.style.transform = 'rotate(-90deg)';
+              } else {
+                logsWrapper.style.maxHeight = '220px';
+                logsCaret.style.transform = 'rotate(0deg)';
+              }
+            });
+          }
+          
+          document.addEventListener('change', (e) => {
+            const target = e.target as HTMLElement | null;
+            if (target && target.classList && target.classList.contains('slave-toggle')) {
+              this.updateControlButtons();
+              this.recomputeRoundPlan();
+            }
+          });
+        }
+
+        // Persist preferred height helpers
+        persistPreviewPreferredHeight(h:number){ try { localStorage.setItem('previewPanel.height', String(h)); } catch {} }
+        restorePreviewPreferredHeight(){
+          try { const v = parseInt(localStorage.getItem('previewPanel.height') || '0', 10); if (v>0) { const content = document.getElementById('preview-content') as HTMLElement | null; if (content) content.style.height = `${v}px`; } } catch {}
+        }
+
+        detectProjectMode(json:any, fileName:string){
+          // Prioridad explícita
+            if(json && typeof json.mode === 'string'){
+              const m = json.mode.toLowerCase();
+              if(m.startsWith('guard')) return 'Guard';
+              if(m.startsWith('image')) return 'Image';
+            }
+            // Señales de Guard (protectionData, protectionArea, protectedPixels, originalPixels, splitInfo)
+            const guardSignals = [
+              json?.protectionData,
+              json?.protectionArea,
+              json?.originalPixels,
+              json?.protectionData?.area,
+              json?.protectionData?.protectedPixels,
+            ].some(Boolean);
+            // Señales de Image (imageData con width/height, remainingPixels, pixels, fullPixelData)
+            const imageSignals = [
+              json?.imageData?.width,
+              json?.imageData?.height,
+              json?.imageData?.fullPixelData,
+              Array.isArray(json?.remainingPixels) && json.remainingPixels.length>0,
+              Array.isArray(json?.imageData?.fullPixelData) && json.imageData.fullPixelData.length>0,
+              Array.isArray(json?.pixels) && json.pixels.length>0
+            ].some(Boolean);
+            if(guardSignals && !imageSignals) return 'Guard';
+            if(imageSignals && !guardSignals) return 'Image';
+            // Heurística por nombre archivo
+            const lower = fileName.toLowerCase();
+            if(/guard|protection/.test(lower)) return 'Guard';
+            if(/image|progress|collage/.test(lower)) return 'Image';
+            // Empate: preferir Guard si protectionData existe
+            if(guardSignals) return 'Guard';
+            if(imageSignals) return 'Image';
+            return 'Image'; // fallback
+        }
+
+    hidePreviewPanel(){ const panel=document.getElementById('preview-panel'); if(panel) panel.style.display='none'; }
+        showPreviewFromProject(json:any){
+          try{
+      const panel=document.getElementById('preview-panel'); if(panel){ panel.style.display='block'; }
+            
+            const canvas=document.getElementById('preview-canvas') as HTMLCanvasElement|null;
+            if(canvas && json?.imageData?.width && json?.imageData?.height && Array.isArray(json?.imageData?.fullPixelData)){
+              const w=json.imageData.width; const h=json.imageData.height; canvas.width=w; canvas.height=h; const ctx=canvas.getContext('2d'); if(ctx){
+                const imgData=ctx.createImageData(w,h);
+                json.imageData.fullPixelData.slice(0,w*h).forEach(p=>{ if(p && p.x>=0&&p.y>=0&&p.x<w&&p.y<h){ const idx=(p.y*w+p.x)*4; imgData.data[idx]=p.r||0; imgData.data[idx+1]=p.g||0; imgData.data[idx+2]=p.b||0; imgData.data[idx+3]=255; }});
+                ctx.putImageData(imgData,0,0);
+              }
+            }
+            
+            // Adjust preview size and auto-fit zoom after rendering
+            setTimeout(() => { this.restorePreviewPreferredHeight(); this.adjustPreviewSize(); this.fitZoom(); }, 100);
+          }catch(e){ this.log('⚠️ Preview render error: '+e.message); }
+        }
+
+        showGuardPreviewFromProject(json:any){
+          try {
+            const panel=document.getElementById('preview-panel'); if(panel){ panel.style.display='block'; }
+            const area = json.protectionData?.area || json.protectionArea;
+            const total = json.protectionData?.protectedPixels || (Array.isArray(json.originalPixels)? json.originalPixels.length:0);
+            
+            if(area && Array.isArray(json.originalPixels)){
+              const originalMap = new Map();
+              json.originalPixels.forEach(p=>{ if(p&&p.x!==undefined&&p.y!==undefined) originalMap.set(`${p.x},${p.y}`, {r:p.r,g:p.g,b:p.b}); });
+              const analysis = { correct:new Map(), incorrect:new Map(), missing: originalMap, originalPixels: originalMap, currentPixels: new Map() };
+              this.guardPreview.analysis = analysis; this.guardPreview.area = area;
+              this.renderGuardPreviewCanvas({analysis, area});
+              this.initGuardPreviewToggles();
+              
+              // Adjust preview size and auto-fit zoom after rendering
+              setTimeout(() => { this.restorePreviewPreferredHeight(); this.adjustPreviewSize(); this.fitZoom(); }, 100);
+            }
+          } catch(e){ this.log('⚠️ Guard preview error: '+e.message); }
+        }
+
+        async clearProject(){
+          try {
+            await fetch(`${this.apiBase()}/api/guard/clear`, { method: 'POST' });
+            // Pedir al slave favorito que pare y quede en idle/watch off y siga emitiendo métricas
+            try { await fetch(`${this.apiBase()}/api/guard/stop`, { method: 'POST' }); } catch {}
+            try { await fetch(`${this.apiBase()}/api/guard/toggle-watch`, { method: 'POST' }); } catch {}
+          } catch (e) {
+            this.log(`⚠️ Error calling /api/guard/clear: ${e?.message || e}`);
+          }
+          // Reset UI state
+          const fileInput = document.getElementById('project-file') as HTMLInputElement | null; if (fileInput) fileInput.value = '';
+          const statusEl = document.getElementById('file-status'); if (statusEl) statusEl.textContent = 'No file selected';
+          const detectedEl = document.getElementById('detected-mode'); if (detectedEl) detectedEl.textContent = 'No file loaded - mode will be auto-detected';
+          const analysisEl = document.getElementById('file-analysis'); if (analysisEl) (analysisEl as HTMLElement).style.display = 'none';
+          this.projectConfig = null; this.detectedBotMode = null; this.lastPreviewData = null; this.guardPreview = { analysis:null, togglesInitialized:false, show:{correct:true, incorrect:true, missing:true}, area:null };
+          const panel = document.getElementById('preview-panel') as HTMLElement | null; if (panel) panel.style.display = 'none';
+          ['repaired-pixels','incorrect-pixels','missing-pixels'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent='0'; });
+          try { localStorage.removeItem('previewPanel.height'); } catch {}
+          this.updateControlButtons();
+          this.log('🧹 Proyecto y preview limpiados');
+        }
+
+        createToggle(id, labelText, checked = false) {
+          return `
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; padding: 8px 0;">
+              <span style="color: #eee; font-size: 14px; flex: 1;">${labelText}</span>
+              <label class="toggle-switch" style="position: relative; display: inline-block; width: 50px; height: 26px; margin-left: 10px;">
+                <input type="checkbox" id="${id}" ${checked ? 'checked' : ''} style="opacity: 0; width: 0; height: 0;">
+                <span class="toggle-slider" style="
+                  position: absolute;
+                  cursor: pointer;
+                  top: 0;
+                  left: 0;
+                  right: 0;
+                  bottom: 0;
+                  background-color: ${checked ? '#22c55e' : '#ef4444'};
+                  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+                  border-radius: 13px;
+                  border: 1px solid ${checked ? '#16a34a' : '#dc2626'};
+                "></span>
+                <span class="toggle-knob" style="
+                  position: absolute;
+                  height: 20px;
+                  width: 20px;
+                  left: ${checked ? '27px' : '3px'};
+                  top: 3px;
+                  background-color: white;
+                  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+                  border-radius: 50%;
+                  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+                "></span>
+              </label>
+            </div>
+          `;
+        }
+
+        createCompactToggle(id, labelText, checked = false) {
+          return `
+            <div class="flex items-center justify-between py-1">
+              <span class="text-xs text-gray-300">${labelText}</span>
+              <label class="relative inline-flex w-9 h-5 items-center cursor-pointer select-none">
+                <input type="checkbox" id="${id}" ${checked ? 'checked' : ''} class="opacity-0 absolute w-0 h-0">
+                <span data-role="track" class="absolute inset-0 rounded-full transition-colors duration-300 ${checked ? 'bg-green-500' : 'bg-red-500'}"></span>
+                <span data-role="knob" class="absolute left-0.5 top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full transition-transform duration-300 ${checked ? 'translate-x-4' : 'translate-x-0'}"></span>
+              </label>
+            </div>
+          `;
+        }
+
+        updateToggleState(toggleId, checked) {
+          const toggle = document.getElementById(toggleId);
+          if (!toggle) return;
+
+          // Prefer the compact version using data-role markers
+          const wrapper = toggle.parentElement as HTMLElement | null;
+          const compactSlider = wrapper?.querySelector('[data-role="track"]') as HTMLElement | null;
+          const compactKnob = wrapper?.querySelector('[data-role\="knob\"]') as HTMLElement | null;
+
+          if (compactSlider && compactKnob) {
+            compactSlider.className = `absolute inset-0 rounded-full transition-colors duration-300 ${checked ? 'bg-green-500' : 'bg-red-500'}`;
+            compactKnob.className = `absolute left-0.5 top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full transition-transform duration-300 ${checked ? 'translate-x-4' : 'translate-x-0'}`;
+            return;
+          }
+
+          // Fallback al estilo antiguo (por si hay legacy)
+          const slider = wrapper?.querySelector('.toggle-slider') as HTMLElement | null;
+          const knob = wrapper?.querySelector('.toggle-knob') as HTMLElement | null;
+          if (slider && knob) {
+            slider.style.backgroundColor = checked ? '#22c55e' : '#ef4444';
+            slider.style.borderColor = checked ? '#16a34a' : '#dc2626';
+            knob.style.left = checked ? '27px' : '3px';
+          }
+        }
+
+        setupGuardPreviewControls() {
+          // Control de zoom (usar los controles actuales si existen; fallback a gp-*)
+          const zoomSlider = (document.getElementById('zoom-slider') as HTMLInputElement) || (document.getElementById('gp-zoom-slider') as HTMLInputElement);
+          const zoomValue = document.getElementById('zoom-level') || document.getElementById('gp-zoom-value');
+          const autoFitBtn = document.getElementById('fit-zoom') || document.getElementById('gp-auto-fit');
+          const canvas = document.getElementById('preview-canvas') as HTMLCanvasElement;
+          
+          if (zoomSlider && zoomValue && canvas) {
+            zoomSlider.addEventListener('input', (e) => {
+              const zoom = parseFloat((e.target as HTMLInputElement).value);
+              this.setZoom(zoom);
+              (zoomValue as HTMLElement).textContent = `${Math.round(zoom * 100)}%`;
+            });
+          }
+          
+          // Auto-ajuste de zoom
+          if (autoFitBtn) {
+            autoFitBtn.addEventListener('click', () => this.fitZoom());
+          }
+          
+          // Toggles de visualización
+          const toggleIds = ['gp-show-correct', 'gp-show-incorrect', 'gp-show-missing'];
+          toggleIds.forEach(id => {
+            const toggle = document.getElementById(id) as HTMLInputElement;
+            if (!toggle) return;
+            
+            // Actualizar estado visual inicial
+            this.updateToggleState(id, toggle.checked);
+            
+            toggle.addEventListener('change', () => {
+              this.updateToggleState(id, toggle.checked);
+              
+              // Actualizar estado interno
+              this.guardPreview.show.correct = (document.getElementById('gp-show-correct') as HTMLInputElement)?.checked || false;
+              this.guardPreview.show.incorrect = (document.getElementById('gp-show-incorrect') as HTMLInputElement)?.checked || false;
+              this.guardPreview.show.missing = (document.getElementById('gp-show-missing') as HTMLInputElement)?.checked || false;
+              
+              // Re-renderizar
+              if (this.guardPreview.analysis && this.guardPreview.area) {
+                this.renderGuardPreviewCanvas({analysis: this.guardPreview.analysis, area: this.guardPreview.area});
+              }
+            });
+          });
+          
+          // Agregar interacciones de canvas mejoradas
+          this.setupCanvasInteractions(canvas);
+        }
+
+  setupCanvasInteractions(canvas) {
+          if (!canvas) return;
+          
+          const canvasContainer = canvas.parentElement;
+          if (!canvasContainer) return;
+          
+          // Configurar contenedor para scroll
+          canvasContainer.style.overflow = 'auto';
+          canvasContainer.style.position = 'relative';
+          
+          // Variables para pan
+          let isPanning = false;
+          let startX = 0;
+          let startY = 0;
+          let scrollLeftStart = 0;
+          let scrollTopStart = 0;
+          
+          // Pan con mouse
+          canvasContainer.addEventListener('mousedown', (e) => {
+            isPanning = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            scrollLeftStart = canvasContainer.scrollLeft;
+            scrollTopStart = canvasContainer.scrollTop;
+            canvasContainer.style.cursor = 'grabbing';
+          });
+          
+          document.addEventListener('mousemove', (e) => {
+            if (!isPanning) return;
+            
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+            
+            canvasContainer.scrollLeft = scrollLeftStart - dx;
+            canvasContainer.scrollTop = scrollTopStart - dy;
+          });
+          
+          document.addEventListener('mouseup', () => {
+            isPanning = false;
+            canvasContainer.style.cursor = 'grab';
+          });
+          
+          // Zoom con rueda del mouse (usa setZoom y el slider actual)
+          canvasContainer.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const slider = (document.getElementById('zoom-slider') as HTMLInputElement) || (document.getElementById('gp-zoom-slider') as HTMLInputElement);
+            const label = document.getElementById('zoom-level') || document.getElementById('gp-zoom-value');
+            if (!slider || !label) return;
+            const factor = 1.1;
+            const oldZoom = parseFloat(slider.value || '1') || 1;
+            const proposed = oldZoom * (e.deltaY < 0 ? factor : 1 / factor);
+            this.setZoom(proposed); // clampa internamente al máximo permitido por la ventana
+          }, { passive: false });
+        }
+
+        initGuardPreviewToggles(){
+          if(this.guardPreview.togglesInitialized) return;
+          
+          // Buscar el contenedor correcto
+          const container = document.getElementById('guard-preview-controls');
+          if(!container) {
+            this.log('⚠️ Container guard-preview-controls not found');
+            return;
+          }
+          
+          // Limpiar contenedor
+          container.innerHTML = '';
+          
+          const controlsHTML = `
+            <div class="space-y-2">
+              ${this.createCompactToggle('gp-show-correct', '✅ Correctos', this.guardPreview.show.correct)}
+              ${this.createCompactToggle('gp-show-incorrect', '❌ Incorrectos', this.guardPreview.show.incorrect)}
+              ${this.createCompactToggle('gp-show-missing', '⚪ Faltantes', this.guardPreview.show.missing)}
+            </div>
+          `;
+          
+          container.innerHTML = controlsHTML;
+          this.setupGuardPreviewControls();
+          this.guardPreview.togglesInitialized = true;
+        }
+
+        updatePreviewFromSlave(slaveId, data){
+          try {
+            if(!data) return; 
+            this.lastPreviewData = data;
+            this.log(`🔄 Processing preview data from ${slaveId}: ${JSON.stringify(Object.keys(data))}`);
+            
+            // Normalizar área: slave modular envía protectedArea
+            const area = data.protectedArea || data.area;
+            if (!area) {
+              this.log('⚠️ No area data found in preview');
+              return;
+            }
+            
+            this.log(`📍 Area: (${area.x1},${area.y1}) → (${area.x2},${area.y2})`);
+            
+            // Función helper para convertir arrays a Maps
+            const toMap = (arr) => {
+              const m = new Map();
+              if (Array.isArray(arr)) {
+                arr.forEach(p => {
+                  if (p && p.x !== undefined && p.y !== undefined) {
+                    m.set(`${p.x},${p.y}`, {
+                      r: p.r || 0, 
+                      g: p.g || 0, 
+                      b: p.b || 0,
+                      originalR: p.originalR,
+                      originalG: p.originalG, 
+                      originalB: p.originalB
+                    });
+                  }
+                });
+              }
+              return m;
+            };
+            
+            // Convertir listas de píxeles a Maps - usar nombres correctos del módulo Guard
+            const correct = toMap(data.correctPixelsList || []);
+            const incorrect = toMap(data.incorrectPixelsList || []); 
+            const missing = toMap(data.missingPixelsList || []);
+            const originalPixels = toMap(data.originalPixels || []);
+            
+            this.log(`🔢 Raw data lengths - CorrectList:${(data.correctPixelsList || []).length}, IncorrectList:${(data.incorrectPixelsList || []).length}, MissingList:${(data.missingPixelsList || []).length}, OriginalList:${(data.originalPixels || []).length}`);
+            this.log(`🔢 Converted pixels - Original:${originalPixels.size}, Correct:${correct.size}, Incorrect:${incorrect.size}, Missing:${missing.size}`);
+            
+            const analysis = { correct, incorrect, missing, originalPixels };
+            
+            // Almacenar y renderizar
+            this.guardPreview.analysis = analysis; 
+            this.guardPreview.area = area; 
+            this.renderGuardPreviewCanvas({analysis, area});
+            
+          } catch(err){ 
+            this.log('⚠️ updatePreviewFromSlave error: ' + err.message); 
+            console.error('Preview processing error:', err, data);
+          }
+        }
+
+        renderGuardPreviewCanvas(payload){
+          try {
+            if(!payload||!payload.analysis||!payload.area) return;
+            this.initGuardPreviewToggles();
+            const panel=document.getElementById('preview-panel'); if(panel) panel.style.display='block';
+            const area=payload.area;
+            
+            // Calcular el total real de píxeles de todas las categorías
+            const correctCount = payload.analysis.correct?.size || 0;
+            const incorrectCount = payload.analysis.incorrect?.size || 0;
+            const missingCount = payload.analysis.missing?.size || 0;
+            const originalCount = payload.analysis.originalPixels?.size || 0;
+            const total = Math.max(originalCount, correctCount + incorrectCount + missingCount);
+            
+            // Actualizar estadísticas en el panel
+            this.updateGuardStatistics(payload.analysis);
+            
+            this.initGuardPreviewToggles();
+            const canvas=document.getElementById('preview-canvas') as HTMLCanvasElement|null; 
+            if(!canvas) return; 
+            
+            const width=area.x2-area.x1+1; 
+            const height=area.y2-area.y1+1; 
+            
+            this.log(`🎨 Rendering ${total} pixels in ${width}x${height} canvas (Correct:${correctCount}, Incorrect:${incorrectCount}, Missing:${missingCount})`);
+            
+            // Configurar canvas
+            canvas.width = width;
+            canvas.height = height;
+            
+            // No modificar style.width/height: el escalado lo gestiona transform/fitZoom
+            
+            const ctx = canvas.getContext('2d');
+            if(!ctx) return;
+            
+            const imageData = ctx.createImageData(width, height);
+            
+            // Inicializar con fondo gris claro
+            for (let i = 0; i < imageData.data.length; i += 4) {
+              imageData.data[i] = 240;     // R
+              imageData.data[i + 1] = 240; // G
+              imageData.data[i + 2] = 240; // B
+              imageData.data[i + 3] = 60;  // Alpha bajo para fondo sutil
+            }
+            
+            // Obtener estado de los toggles
+            const showCorrectEl = document.getElementById('gp-show-correct') as HTMLInputElement;
+            const showIncorrectEl = document.getElementById('gp-show-incorrect') as HTMLInputElement;
+            const showMissingEl = document.getElementById('gp-show-missing') as HTMLInputElement;
+            
+            const showCorrect = showCorrectEl ? showCorrectEl.checked : this.guardPreview.show.correct;
+            const showIncorrect = showIncorrectEl ? showIncorrectEl.checked : this.guardPreview.show.incorrect;
+            const showMissing = showMissingEl ? showMissingEl.checked : this.guardPreview.show.missing;
+            
+            this.log(`�️ Display states - Correct: ${showCorrect}, Incorrect: ${showIncorrect}, Missing: ${showMissing}`);
+            
+            // Función para dibujar píxel
+            const drawPixel = (x, y, r, g, b, a = 255) => {
+              const index = ((y - area.y1) * width + (x - area.x1)) * 4;
+              if (index >= 0 && index < imageData.data.length - 3) {
+                imageData.data[index] = r;
+                imageData.data[index + 1] = g;
+                imageData.data[index + 2] = b;
+                imageData.data[index + 3] = a;
+              }
+            };
+            
+            // Dibujar píxeles originales como fondo
+            if (payload.analysis.originalPixels) {
+              for (const [key, pixel] of payload.analysis.originalPixels) {
+                const [x, y] = key.split(',').map(Number);
+                drawPixel(x, y, pixel.r || 128, pixel.g || 128, pixel.b || 128, 255);
+              }
+            }
+            
+            // Dibujar píxeles correctos (verde) si está habilitado
+            if (showCorrect && payload.analysis.correct) {
+              for (const [key, _data] of payload.analysis.correct) {
+                const [x, y] = key.split(',').map(Number);
+                drawPixel(x, y, 0, 255, 0, 180); // Verde semi-transparente
+              }
+            }
+            
+            // Dibujar píxeles incorrectos (rojo) si está habilitado
+            if (showIncorrect && payload.analysis.incorrect) {
+              for (const [key, _data] of payload.analysis.incorrect) {
+                const [x, y] = key.split(',').map(Number);
+                drawPixel(x, y, 255, 0, 0, 220); // Rojo más opaco
+              }
+            }
+            
+            // Dibujar píxeles faltantes (amarillo) si está habilitado
+            if (showMissing && payload.analysis.missing) {
+              for (const [key, _pixel] of payload.analysis.missing) {
+                const [x, y] = key.split(',').map(Number);
+                drawPixel(x, y, 255, 255, 0, 200); // Amarillo
+              }
+            }
+            
+            // ¡CRÍTICO! Dibujar los píxeles en el canvas
+            ctx.putImageData(imageData, 0, 0);
+            this.log(`🎨 Canvas rendered successfully with ${correctCount + incorrectCount + missingCount} visible pixels`);
+            
+            // Actualizar estadísticas en panel principal también
+            this.updateGuardStatistics(payload.analysis);
+            
+            // Adjust preview size after rendering
+            setTimeout(() => this.adjustPreviewSize(), 50);
+            
+            // Actualizar estadísticas del canvas
+            let stats=document.getElementById('guard-preview-stats'); 
+            if(!stats){ 
+              stats=document.createElement('div'); 
+              stats.id='guard-preview-stats'; 
+              canvas.parentElement.appendChild(stats); 
+            }
+            const c=payload.analysis.correct?.size||0, i=payload.analysis.incorrect?.size||0, m=payload.analysis.missing?.size||0, tot=(payload.analysis.originalPixels?.size)||(c+i+m)||0, acc=tot?((c/tot)*100).toFixed(1):'0.0';
+            stats.innerHTML=`
+              <div style="margin-top:8px;padding:8px;background:#374151;border-radius:6px;font-size:12px;color:#e5e7eb;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                  <span style="color:#10b981;">✅ Correctos:</span><strong>${c}</strong>
+                </div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                  <span style="color:#ef4444;">❌ Incorrectos:</span><strong>${i}</strong>
+                </div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                  <span style="color:#f59e0b;">⚪ Faltantes:</span><strong>${m}</strong>
+                </div>
+                <div style="display:flex;justify-content:space-between;border-top:1px solid #4b5563;padding-top:4px;margin-top:4px;">
+                  <span style="color:#8b5cf6;">🎯 Precisión:</span><strong>${acc}%</strong>
+                </div>
+                <div style="font-size:10px;color:#9ca3af;text-align:center;margin-top:4px;">
+                  Canvas: ${width}x${height} | Total: ${tot}
+                </div>
+              </div>
+            `;
+            
+          } catch(err){ 
+            this.log('⚠️ renderGuardPreviewCanvas error: '+err.message); 
+            console.error('Canvas render error:', err, payload);
+          }
+        }
+
+        updateGuardStatistics(analysis) {
+          const correctCount = analysis.correct?.size || 0;
+          const incorrectCount = analysis.incorrect?.size || 0;  
+          const missingCount = analysis.missing?.size || 0;
+          const totalCount = analysis.originalPixels?.size || (correctCount + incorrectCount + missingCount);
+          const accuracy = totalCount > 0 ? ((correctCount / totalCount) * 100).toFixed(1) : '0.0';
+          
+          this.log(`📊 Updating statistics: C:${correctCount}, I:${incorrectCount}, M:${missingCount}, T:${totalCount}, A:${accuracy}%`);
+          
+          // Actualizar panel de telemetría en tiempo real con estadísticas de guard específicas
+          const rpEl = document.getElementById('repaired-pixels'); 
+          const incEl = document.getElementById('incorrect-pixels'); 
+          const missEl = document.getElementById('missing-pixels');
+          
+          if (rpEl) {
+            rpEl.textContent = String(correctCount);
+            this.log(`✅ Updated correctos: ${correctCount}`);
+          }
+          if (incEl) {
+            incEl.textContent = String(incorrectCount);
+            this.log(`❌ Updated incorrectos: ${incorrectCount}`);
+          }
+          if (missEl) {
+            missEl.textContent = String(missingCount);  
+            this.log(`⚪ Updated faltantes: ${missingCount}`);
+          }
+          
+          // Actualizar estadísticas del panel de preview
+          const previewCorrectEl = document.getElementById('preview-correct-count');
+          const previewIncorrectEl = document.getElementById('preview-incorrect-count');
+          const previewMissingEl = document.getElementById('preview-missing-count');
+          const previewAccuracyEl = document.getElementById('preview-accuracy');
+          
+          if (previewCorrectEl) previewCorrectEl.textContent = String(correctCount);
+          if (previewIncorrectEl) previewIncorrectEl.textContent = String(incorrectCount);
+          if (previewMissingEl) previewMissingEl.textContent = String(missingCount);
+          if (previewAccuracyEl) previewAccuracyEl.textContent = `${accuracy}%`;
+          // Nota: evitamos duplicar el log de 'faltantes'; ya se actualizó más arriba
+          
+          // Agregar indicador de precisión si no existe
+          let accuracyEl = document.getElementById('guard-accuracy');
+          if (!accuracyEl) {
+            const panel = document.querySelector('.grid.grid-cols-1.sm\\:grid-cols-4.gap-4');
+            if (panel && panel.children.length >= 3) {
+              const accuracyCard = document.createElement('div');
+              accuracyCard.className = 'bg-card text-card-foreground rounded-lg border p-4';
+              accuracyCard.innerHTML = `
+                <div class="text-sm font-medium text-muted-foreground">🎯 Precisión</div>
+                <div id="guard-accuracy" class="text-2xl font-bold">-</div>
+              `;
+              panel.appendChild(accuracyCard);
+              accuracyEl = document.getElementById('guard-accuracy');
+              this.log(`🎯 Created accuracy panel`);
+            }
+          }
+          if (accuracyEl) {
+            accuracyEl.textContent = `${accuracy}%`;
+            this.log(`🎯 Updated accuracy: ${accuracy}%`);
+          }
+          // Actualizar barra de progreso global en el panel de telemetría
+          this.updateOverallProgressBar(parseFloat(accuracy));
+        }
+
+        handleFileChange(e) {
+          try {
+            const fileInput = e.target as HTMLInputElement;
+            const statusEl = document.getElementById('file-status');
+            const detectedEl = document.getElementById('detected-mode');
+            const analysisEl = document.getElementById('file-analysis');
+            if (analysisEl) analysisEl.style.display = 'none';
+            if (!fileInput || !fileInput.files || !fileInput.files.length) {
+              this.projectConfig = null; this.detectedBotMode = null; if (statusEl) statusEl.textContent = 'No file selected'; if (detectedEl) detectedEl.textContent = 'No file loaded - mode will be auto-detected'; this.updateControlButtons(); return;
+            }
+            const file = fileInput.files[0];
+            if (statusEl) statusEl.textContent = `Reading ${file.name}...`;
+            const reader = new FileReader();
+            reader.onload = () => {
+              let parsedOk=false; let mode='Image'; let json=null;
+              try {
+                const raw = reader.result as string;
+                json = JSON.parse(raw);
+                this.projectConfig = json;
+                mode = this.detectProjectMode(json, file.name);
+                this.detectedBotMode = mode;
+                parsedOk=true;
+              } catch (err) {
+                this.projectConfig = null; this.detectedBotMode = null; if (detectedEl) detectedEl.textContent='Parse error'; if (statusEl) statusEl.textContent='Invalid JSON'; this.updateControlButtons(); this.log('❌ Error parsing file: '+ err.message);
+              }
+              if(!parsedOk) return; // no continuar a preview si JSON malo
+              if (detectedEl) detectedEl.textContent = `Detected mode: ${mode}`;
+              if (statusEl) statusEl.textContent = `Loaded ${file.name}`;
+              if (analysisEl && json) {
+                let info:string[]=[];
+                if (mode === 'Image') {
+                  if (json.imageData?.width && json.imageData?.height) info.push(`${json.imageData.width}x${json.imageData.height}`);
+                  if (Array.isArray(json.remainingPixels)) info.push(`remaining:${json.remainingPixels.length}`);
+                  if (Array.isArray(json.imageData?.fullPixelData)) info.push(`full:${json.imageData.fullPixelData.length}`);
+                } else if (mode === 'Guard') {
+                  const area = json.protectionData?.area || json.protectionArea;
+                  if (area) info.push(`area:(${area.x1},${area.y1})-(${area.x2},${area.y2})`);
+                  if (json.protectionData?.protectedPixels) info.push(`protected:${json.protectionData.protectedPixels}`);
+                  if (Array.isArray(json.originalPixels)) info.push(`pixels:${json.originalPixels.length}`);
+                }
+                analysisEl.textContent = info.length? info.join(' · '): 'No metadata';
+                analysisEl.style.display='block';
+              }
+              try {
+                if (mode === 'Image') this.showPreviewFromProject(json); 
+                else if (mode === 'Guard') this.showGuardPreviewFromProject(json); 
+                else this.hidePreviewPanel();
+                // NUEVO: si es Guard, enviar automáticamente al backend para que el slave favorito reconstruya estado
+                if (mode === 'Guard') {
+                  try {
+                    fetch(`${this.apiBase()}/api/guard/upload`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ filename: file.name, data: json })
+                    }).then(r=>r.json()).then(resp=>{ this.log(`📤 Guard upload sent -> ${resp.sent_to||'n/a'} pixels=${json.originalPixels?.length||json.protectionData?.protectedPixels||0}`); }).catch(err=>{ this.log('❌ Guard upload error: '+err.message); });
+                  } catch (upErr) { this.log('❌ Guard upload exception: '+ upErr.message); }
+                }
+              } catch(preErr){ this.log('⚠️ Preview error (non-fatal): '+preErr.message); }
+              this.updateControlButtons();
+              this.log(`📄 Project file loaded (${file.name}) mode=${this.detectedBotMode}`);
+            };
+            reader.onerror = () => { this.projectConfig = null; this.detectedBotMode = null; if (statusEl) statusEl.textContent='Read error'; this.updateControlButtons(); this.log('❌ File read error'); };
+            reader.readAsText(file);
+          } catch (ex) {
+            this.log('❌ Unexpected handleFileChange error: '+ ex.message);
+          }
+        }
+
+        updateControlButtons() {
+          const selectedSlaves = document.querySelectorAll<HTMLInputElement>('.slave-toggle:checked');
+          const hasMode = this.detectedBotMode !== null;
+          
+          const canStart = selectedSlaves.length > 0 && hasMode;
+          const startBtn = document.getElementById('start-btn') as HTMLButtonElement | null; if (startBtn) startBtn.disabled = !canStart;
+          
+          // Enable distribute repairs button if there are connected slaves
+          const hasSlaves = this.slaves.size > 0;
+          const distBtn = document.getElementById('distribute-repairs-btn') as HTMLButtonElement | null; if (distBtn) distBtn.disabled = !hasSlaves;
+          const oneBatchBtn = document.getElementById('one-batch-btn') as HTMLButtonElement | null; if (oneBatchBtn) oneBatchBtn.disabled = !hasSlaves;
+          const oneBatchBtnPreview = document.getElementById('one-batch-btn-preview') as HTMLButtonElement | null; if (oneBatchBtnPreview) oneBatchBtnPreview.disabled = !hasSlaves;
+        }
+
+  async startSession() {
+          const selectedSlaves = Array.from(document.querySelectorAll<HTMLInputElement>('.slave-toggle:checked')).map(cb => cb.value);
+          try { localStorage.setItem('selectedSlaves', JSON.stringify(selectedSlaves)); } catch {}
+          try { await fetch(`${this.apiBase()}/api/ui/selected-slaves`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slave_ids: selectedSlaves }) }); } catch {}
+          const strategy = (document.getElementById('charge-strategy') as HTMLSelectElement | null)?.value;
+
+          if (!selectedSlaves.length || !this.detectedBotMode) {
+            this.log('Please select slaves and load a project file');
+            return;
+          }
+
+          try {
+            this.log(`🚀 Starting session with mode: ${this.detectedBotMode}`);
+            
+            // Create project
+            let projectConfig = { 
+              mode: this.detectedBotMode, 
+              config: this.projectConfig || {} 
+            };
+
+            const projectResponse = await fetch(`${this.apiBase()}/api/projects`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name: `Session ${Date.now()}`, ...projectConfig })
+            });
+            
+            const projectData = await projectResponse.json();
+            this.log(`📁 Project created: ${projectData.project_id}`);
+
+            // Create session
+            const sessionResponse = await fetch(`${this.apiBase()}/api/sessions`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                project_id: projectData.project_id,
+                slave_ids: selectedSlaves,
+                strategy: strategy
+              })
+            });
+            
+            const sessionData = await sessionResponse.json();
+            this.currentSession = sessionData.session_id;
+            this.log(`🎯 Session created: ${this.currentSession}`);
+
+            // Start session (continuous orchestrator)
+            const startRes = await fetch(`${this.apiBase()}/api/sessions/${this.currentSession}/start`, { method: 'POST' });
+            const startJs = await startRes.json();
+            const totalRem = startJs?.total_remaining ?? 0;
+            this.log(`✅ Session started; total remaining charges: ${totalRem}`);
+            try { const t = (window as any).__toast; if (t) t(`Sesión iniciada • Cargas totales: ${totalRem}`, 'info', 3000); } catch {}
+            const rc = document.getElementById('remaining-charges'); if (rc) rc.textContent = String(totalRem);
+            const pauseBtn = document.getElementById('pause-btn') as HTMLButtonElement | null; if (pauseBtn) pauseBtn.disabled = false;
+            const stopBtn = document.getElementById('stop-btn') as HTMLButtonElement | null; if (stopBtn) stopBtn.disabled = false;
+            const oneBatchBtn = document.getElementById('one-batch-btn') as HTMLButtonElement | null; if (oneBatchBtn) oneBatchBtn.disabled = false;
+            const startBtn2 = document.getElementById('start-btn') as HTMLButtonElement | null; if (startBtn2) startBtn2.disabled = true;
+            
+          } catch (error) {
+            this.log(`❌ Error starting session: ${error}`);
+          }
+        }
+
+        async pauseSession() {
+          if (!this.currentSession) return;
+          
+          try {
+            await fetch(`${this.apiBase()}/api/sessions/${this.currentSession}/pause`, { method: 'POST' });
+            this.log('Session paused');
+          } catch (error) {
+            this.log(`Error pausing session: ${error}`);
+          }
+        }
+
+        async stopSession() {
+          if (!this.currentSession) return;
+          
+          try {
+            await fetch(`${this.apiBase()}/api/sessions/${this.currentSession}/stop`, { method: 'POST' });
+            this.log('Session stopped');
+            this.currentSession = null;
+            const startBtn3 = document.getElementById('start-btn') as HTMLButtonElement | null; if (startBtn3) startBtn3.disabled = false;
+            const pauseBtn2 = document.getElementById('pause-btn') as HTMLButtonElement | null; if (pauseBtn2) pauseBtn2.disabled = true;
+            const stopBtn2 = document.getElementById('stop-btn') as HTMLButtonElement | null; if (stopBtn2) stopBtn2.disabled = true;
+            const oneBatchBtn = document.getElementById('one-batch-btn') as HTMLButtonElement | null; if (oneBatchBtn) oneBatchBtn.disabled = true;
+          } catch (error) {
+            this.log(`Error stopping session: ${error}`);
+          }
+        }
+
+        async sendOneBatch() {
+          try {
+            const selectedSlaves = Array.from(document.querySelectorAll<HTMLInputElement>('.slave-toggle:checked')).map(cb => cb.value);
+            if (!selectedSlaves.length) { this.log('⚠️ Selecciona al menos un slave'); return; }
+            if (!this.detectedBotMode || !this.projectConfig) { this.log('⚠️ Carga un proyecto antes de pedir un lote'); try { const t=(window as any).__toast; if(t) t('Carga un proyecto primero', 'warning', 2500); } catch {} return; }
+            // Asegurar sesión/proyecto creados si no existían
+            if (!this.currentSession) {
+              let projectConfig = { mode: this.detectedBotMode, config: this.projectConfig || {} };
+              const projectResponse = await fetch(`${this.apiBase()}/api/projects`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: `Session ${Date.now()}`, ...projectConfig }) });
+              const projectData = await projectResponse.json();
+              const sessionResponse = await fetch(`${this.apiBase()}/api/sessions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project_id: projectData.project_id, slave_ids: selectedSlaves, strategy: (document.getElementById('charge-strategy') as HTMLSelectElement | null)?.value || 'balanced' }) });
+              const sessionData = await sessionResponse.json();
+              this.currentSession = sessionData.session_id;
+            }
+            this.awaitingOneBatchToast = true;
+            this.log('🎯 Ejecutando un lote usando el planificador cooperativo');
+            const res = await fetch(`${this.apiBase()}/api/sessions/${this.currentSession}/one-batch`, { method: 'POST' });
+            const js = await res.json();
+            if (res.ok && js.ok) {
+              this.log(`✅ Lote planificado: asignados ${js.assigned}, cargas totales ${js.total_remaining}`);
+              const rc = document.getElementById('remaining-charges'); if (rc) rc.textContent = String(js.total_remaining ?? '');
+              try { const t = (window as any).__toast; if (t) t(`Lote en marcha: ${js.assigned} px`, 'info', 2400); } catch {}
+            } else {
+              this.log(`⚠️ No se pudo planificar lote: ${js.reason || js.detail || 'unknown'}`);
+              try { const t = (window as any).__toast; if (t) t(`No hay trabajo: ${js.reason || ''}`,'warning', 2400); } catch {}
+            }
+          } catch (e) {
+            this.log(`❌ Error en 'Un lote': ${e?.message || e}`);
+            try { const t = (window as any).__toast; if (t) t('Error solicitando lote', 'error', 3500); } catch {}
+          }
+        }
+
+        
+
+          async loadGuardConfig(){
+            const st = document.getElementById('guard-config-status');
+            try {
+              if (st) st.textContent = 'Loading...';
+              const res = await fetch(`${this.apiBase()}/api/guard/config`);
+              const js = await res.json();
+              this.guardConfig = js.config || {};
+              this.autoDistribute = !!(this.guardConfig as any)?.autoDistribute;
+              if (st) st.textContent = 'Config loaded';
+              this.log('⚙️ Guard config loaded');
+            } catch(e: any){
+              if (st) st.textContent = 'Error loading config';
+              this.log('❌ Error loading guard config: '+ e?.message);
+            }
+          }
+
+          applyGuardConfigToForm(){
+            const cfg = (this.guardConfig as any) || {};
+            const map = [
+              ['gc-protectionPattern','protectionPattern'],
+              ['gc-preferColor','preferColor','checkbox'],
+              ['gc-excludeColor','excludeColor','checkbox'],
+              ['gc-spendAllPixelsOnStart','spendAllPixelsOnStart','checkbox'],
+              ['gc-randomWaitTime','randomWaitTime','checkbox'],
+              ['gc-watchMode','watchMode','checkbox'],
+              ['gc-autoDistribute','autoDistribute','checkbox'],
+              ['gc-minChargesToWait','minChargesToWait'],
+              ['gc-pixelsPerBatch','pixelsPerBatch'],
+              ['gc-randomWaitMin','randomWaitMin'],
+              ['gc-randomWaitMax','randomWaitMax'],
+              ['gc-colorThreshold','colorThreshold']
+            ];
+            map.forEach(([id,key,type])=>{ 
+              const el:any = document.getElementById(id); 
+              if(!el) return; 
+              if(type==='checkbox') el.checked = !!(cfg as any)[key]; 
+              else if((cfg as any)[key]!==undefined) el.value = (cfg as any)[key]; 
+            });
+          }
+
+          async saveGuardConfig(){
+            const payload:any = {};
+            const fields = [
+              ['gc-protectionPattern','protectionPattern','value'],
+              ['gc-preferColor','preferColor','checked'],
+              ['gc-excludeColor','excludeColor','checked'],
+              ['gc-spendAllPixelsOnStart','spendAllPixelsOnStart','checked'],
+              ['gc-randomWaitTime','randomWaitTime','checked'],
+              ['gc-watchMode','watchMode','checked'],
+              ['gc-autoDistribute','autoDistribute','checked'],
+              ['gc-minChargesToWait','minChargesToWait','value','int'],
+              ['gc-pixelsPerBatch','pixelsPerBatch','value','int'],
+              ['gc-randomWaitMin','randomWaitMin','value','float'],
+              ['gc-randomWaitMax','randomWaitMax','value','float'],
+              ['gc-colorThreshold','colorThreshold','value','int']
+            ];
+            fields.forEach(([id,key,prop,cast])=>{ const el:any=document.getElementById(id); if(!el) return; let v=el[prop]; if(cast==='int') v=parseInt(v,10); else if(cast==='float') v=parseFloat(v); payload[key]=v; });
+            try {
+              const res = await fetch(`${this.apiBase()}/api/guard/config`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+              const js = await res.json();
+              if(js.ok){ this.guardConfig = js.config; this.autoDistribute = !!this.guardConfig.autoDistribute; this.log('💾 Guard config saved'); try{ this.recomputeRoundPlan(); }catch{} }
+              else { this.log('⚠️ Guard config save failed'); }
+            } catch(e){ this.log('❌ Error saving guard config: '+ e.message); }
+          }
+
+          openAdvancedGuardConfig(){
+            if (document.getElementById('guardConfigOverlay')) { document.getElementById('guardConfigOverlay').style.display='flex'; return; }
+            const overlay = document.createElement('div');
+            overlay.id = 'guardConfigOverlay';
+            overlay.style.cssText = 'position:fixed;inset:0;display:flex;align-items:flex-start;justify-content:flex-start;padding:24px;z-index:6000;background:rgba(0,0,0,0.45);backdrop-filter:blur(3px);';
+            const win = document.createElement('div');
+            win.style.cssText = 'background:#1a1d23;color:#e2e8f0;width:560px;max-width:95vw;max-height:92vh;overflow:auto;border:2px solid #333;border-radius:14px;box-shadow:0 12px 34px rgba(0,0,0,0.55);font-family:Segoe UI,Roboto,sans-serif;display:flex;flex-direction:column;position:relative;';
+            win.innerHTML = `<div style="padding:14px 18px;background:#243041;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:10;"><h2 style="margin:0;font-size:15px;display:flex;align-items:center;gap:8px;">⚙️ Guard Config Avanzada</h2><button id='advClose' style='background:#3b4b5f;border:none;color:#ddd;padding:6px 10px;border-radius:6px;cursor:pointer;'>✕</button></div><div id='advBody' style='padding:16px;display:grid;grid-template-columns:1fr;gap:16px;'></div><div style='padding:12px 16px;background:#243041;display:flex;justify-content:flex-end;gap:10px;position:sticky;bottom:0;'><button id='advReset' style='background:#6b7280;border:none;color:#fff;padding:8px 14px;border-radius:6px;cursor:pointer;'>🔄 Reset</button><button id='advSave' style='background:#2563eb;border:none;color:#fff;padding:8px 14px;border-radius:6px;cursor:pointer;'>💾 Guardar</button></div>`;
+          overlay.appendChild(win); document.body.appendChild(overlay);
+          const body = win.querySelector('#advBody');
+          const block = (title, inner) => `<div style='background:#2d3748;padding:12px;border:1px solid #4a5568;border-radius:8px;'><h3 style='margin:0 0 10px;font-size:13px;color:#60a5fa;'>${title}</h3>${inner}</div>`;
+          body.innerHTML =
+            block('Patrón',`<select id='adv-protectionPattern' style='width:100%;padding:6px;background:#374151;border:1px solid #6b7280;color:#e5e7eb;border-radius:6px;'>${['random','lineUp','lineDown','lineLeft','lineRight','center','borders','spiral','zigzag','diagonal','cluster','wave','corners','sweep','priority','proximity','quadrant','scattered','snake','diagonalSweep','spiralClockwise','spiralCounterClockwise','biasedRandom','anchorPoints'].map(p=>`<option value="${p}">${p}</option>`).join('')}</select>`)
+            + block('Preferidos',`<label style='display:flex;align-items:center;gap:6px;font-size:12px;'><input type='checkbox' id='adv-preferColor'> preferColor</label><div id='adv-preferredColors' style='display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;'></div><button id='adv-clearPreferred' style='display:none;margin-top:6px;background:#ef4444;color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;'>Clear</button>`)
+            + block('Excluidos',`<label style='display:flex;align-items:center;gap:6px;font-size:12px;'><input type='checkbox' id='adv-excludeColor'> excludeColor</label><div id='adv-excludedColors' style='display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;'></div><button id='adv-clearExcluded' style='display:none;margin-top:6px;background:#ef4444;color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;'>Clear</button>`)
+            + block('Cargas & Lotes',`<label style='font-size:12px;'>minChargesToWait<input id='adv-minChargesToWait' type='number' min='0' style='width:100%;margin-top:4px;padding:6px;background:#374151;border:1px solid #6b7280;color:#e5e7eb;border-radius:6px;'></label><label style='font-size:12px;margin-top:8px;'>pixelsPerBatch<input id='adv-pixelsPerBatch' type='number' min='1' style='width:100%;margin-top:4px;padding:6px;background:#374151;border:1px solid #6b7280;color:#e5e7eb;border-radius:6px;'></label><label style='display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;'><input type='checkbox' id='adv-spendAllPixelsOnStart'> spendAllPixelsOnStart</label>`)
+            + block('Esperas Aleatorias',`<label style='display:flex;align-items:center;gap:6px;font-size:12px;'><input type='checkbox' id='adv-randomWaitTime'> randomWaitTime</label><div style='display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;'><div><span style='font-size:10px;'>Min (s)</span><input id='adv-randomWaitMin' type='number' step='0.1' min='0' style='width:100%;padding:6px;background:#374151;border:1px solid #6b7280;color:#e5e7eb;border-radius:6px;'></div><div><span style='font-size:10px;'>Max (s)</span><input id='adv-randomWaitMax' type='number' step='0.1' min='0' style='width:100%;padding:6px;background:#374151;border:1px solid #6b7280;color:#e5e7eb;border-radius:6px;'></div></div>`)
+            + block('Umbral & Modo',`<label style='font-size:12px;'>colorThreshold<input id='adv-colorThreshold' type='number' min='0' max='255' style='width:100%;margin-top:4px;padding:6px;background:#374151;border:1px solid #6b7280;color:#e5e7eb;border-radius:6px;'></label><label style='display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;'><input type='checkbox' id='adv-watchMode'> watchMode</label><label style='display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;'><input type='checkbox' id='adv-autoDistribute'> autoDistribute</label>`);
+          const cfg = this.guardConfig || {};
+          const setVal = (sel,val,type) => { const el = win.querySelector(sel); if (!el) return; if (type==='checkbox') el.checked = !!val; else if (val!==undefined) el.value = val; };
+          ['protectionPattern','preferColor','excludeColor','minChargesToWait','pixelsPerBatch','spendAllPixelsOnStart','randomWaitTime','randomWaitMin','randomWaitMax','colorThreshold','watchMode','autoDistribute'].forEach(k=>{
+            const idMap = {'protectionPattern':'#adv-protectionPattern','preferColor':'#adv-preferColor','excludeColor':'#adv-excludeColor','minChargesToWait':'#adv-minChargesToWait','pixelsPerBatch':'#adv-pixelsPerBatch','spendAllPixelsOnStart':'#adv-spendAllPixelsOnStart','randomWaitTime':'#adv-randomWaitTime','randomWaitMin':'#adv-randomWaitMin','randomWaitMax':'#adv-randomWaitMax','colorThreshold':'#adv-colorThreshold','watchMode':'#adv-watchMode','autoDistribute':'#adv-autoDistribute'}; const sel=idMap[k]; if(!sel) return; const type=['preferColor','excludeColor','spendAllPixelsOnStart','randomWaitTime','watchMode','autoDistribute'].includes(k)?'checkbox':undefined; setVal(sel,cfg[k],type); });
+          const preferred = new Set(cfg.preferredColorIds||[]);
+          const excluded = new Set(cfg.excludedColorIds||[]);
+          const colors = (this.lastPreviewData && this.lastPreviewData.availableColors) || [];
+          const renderChips = (wrapSel,set,clearSel) => { const wrap = win.querySelector(wrapSel); if(!wrap) return; wrap.innerHTML=''; setTimeout(()=>{ colors.forEach(c=>{ const chip=document.createElement('div'); chip.style.cssText=`width:26px;height:26px;border-radius:6px;cursor:pointer;border:2px solid ${set.has(c.id)?'#10b981':'transparent'};background:rgb(${c.r},${c.g},${c.b});`; chip.title=`Color ${c.id}`; chip.addEventListener('click',()=>{ if(set.has(c.id)) set.delete(c.id); else set.add(c.id); chip.style.borderColor=set.has(c.id)?'#10b981':'transparent'; updateClear(); }); wrap.appendChild(chip); }); updateClear(); },0); function updateClear(){ const btn=win.querySelector(clearSel); if(btn) btn.style.display=set.size>0?'block':'none'; }};
+          renderChips('#adv-preferredColors',preferred,'#adv-clearPreferred');
+          renderChips('#adv-excludedColors',excluded,'#adv-clearExcluded');
+          win.querySelector('#adv-clearPreferred')?.addEventListener('click',()=>{ preferred.clear(); renderChips('#adv-preferredColors',preferred,'#adv-clearPreferred'); });
+          win.querySelector('#adv-clearExcluded')?.addEventListener('click',()=>{ excluded.clear(); renderChips('#adv-excludedColors',excluded,'#adv-clearExcluded'); });
+          const close = () => overlay.style.display='none';
+          win.querySelector('#advClose').addEventListener('click', close);
+          overlay.addEventListener('click', e=>{ if(e.target===overlay) close(); });
+          (win.querySelector('#advSave') as any).addEventListener('click', async ()=>{
+            const payload = {
+              protectionPattern: (win.querySelector('#adv-protectionPattern') as any)?.value,
+              preferColor: (win.querySelector('#adv-preferColor') as any)?.checked,
+              excludeColor: (win.querySelector('#adv-excludeColor') as any)?.checked,
+              minChargesToWait: parseInt((win.querySelector('#adv-minChargesToWait') as any)?.value||'0',10),
+              pixelsPerBatch: parseInt((win.querySelector('#adv-pixelsPerBatch') as any)?.value||'1',10),
+              spendAllPixelsOnStart: (win.querySelector('#adv-spendAllPixelsOnStart') as any)?.checked,
+              randomWaitTime: (win.querySelector('#adv-randomWaitTime') as any)?.checked,
+              randomWaitMin: parseFloat((win.querySelector('#adv-randomWaitMin') as any)?.value||'0'),
+              randomWaitMax: parseFloat((win.querySelector('#adv-randomWaitMax') as any)?.value||'0'),
+              colorThreshold: parseInt((win.querySelector('#adv-colorThreshold') as any)?.value||'10',10),
+              watchMode: (win.querySelector('#adv-watchMode') as any)?.checked,
+              autoDistribute: (win.querySelector('#adv-autoDistribute') as any)?.checked,
+              preferredColorIds: Array.from(preferred),
+              excludedColorIds: Array.from(excluded)
+            } as any;
+            try { const r = await fetch(`${this.apiBase()}/api/guard/config`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); const j = await r.json(); if(j.ok){ this.guardConfig=j.config; this.applyGuardConfigToForm(); this.log('💾 Config avanzada guardada'); close(); } else { this.log('⚠️ Error guardando config avanzada'); } } catch(e){ this.log('❌ Error guardando avanzada: '+e.message); }
+          });
+          win.querySelector('#advReset').addEventListener('click', async ()=>{
+            if(!confirm('Reset to defaults?')) return; const defaults={protectionPattern:'random',preferColor:false,excludeColor:false,minChargesToWait:20,pixelsPerBatch:10,spendAllPixelsOnStart:false,randomWaitTime:false,randomWaitMin:5,randomWaitMax:15,colorThreshold:10,watchMode:true,autoDistribute:false,preferredColorIds:[],excludedColorIds:[]};
+            const r = await fetch(`${this.apiBase()}/api/guard/config`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(defaults)}); const j = await r.json(); if(j.ok){ this.guardConfig=j.config; this.applyGuardConfigToForm(); this.log('🔄 Config reseteada'); close(); }
+          });
+        }
+        log(message: string) {
+          const container = document.getElementById('logs-container');
+          if(!container) return;
+          const timestamp = new Date().toLocaleTimeString();
+          const logEntry = document.createElement('div');
+          logEntry.className = 'text-xs mb-1';
+          logEntry.innerHTML = `<span class="text-muted-foreground">[${timestamp}]</span> ${message}`;
+          container.appendChild(logEntry);
+          container.scrollTop = container.scrollHeight;
+          while (container.children.length > 200) { container.removeChild(container.firstChild); }
+        }
+
+        // Dedupe helper with TTL
+        logOnce(key: string, message: string, ttl: number = 4000) {
+          try {
+            const now = Date.now();
+            // cleanup
+            for (const [k, t] of this.recentLogKeys.entries()) {
+              if (now - t > ttl) this.recentLogKeys.delete(k);
+            }
+            if (this.recentLogKeys.has(key)) return; // skip duplicate within TTL
+            this.recentLogKeys.set(key, now);
+            this.log(message);
+          } catch { this.log(message); }
+        }
+        
+        getFavoriteSlaveId(): string | null {
+          try {
+            for (const s of this.slaves.values()) { if (s && s.is_favorite) return s.id; }
+          } catch {}
+          return null;
+        }
+        
+        apiBase() { 
+          return `${window.location.protocol}//${window.location.hostname}:8008`; 
+        }
+
+        // ======= NUEVOS HELPERS UI DE CUOTAS Y PROGRESO =======
+        updateSlaveCardQuota(slaveId:string, value:number, pct:number){
+          try{
+            const el = document.getElementById(`slave-${slaveId}-quota`);
+            const bar = document.getElementById(`slave-${slaveId}-quota-bar`);
+            if (el) el.textContent = String(value || 0);
+            if (bar) (bar as HTMLElement).style.width = `${Math.max(0, Math.min(100, Math.round((pct || 0) * 100)))}%`;
+          }catch{}
+        }
+
+        recomputeRoundPlan(){
+          try {
+            const selectedIds = Array.from(document.querySelectorAll<HTMLInputElement>('.slave-toggle:checked')).map(cb => cb.value);
+            if (!selectedIds.length) {
+              this.slaves.forEach((_, sid) => this.updateSlaveCardQuota(sid, 0, 0));
+              this.currentRoundPlan = {};
+              return;
+            }
+            const charges:any = {}; let total = 0;
+            selectedIds.forEach(sid => { const rc = Number(this.slaves.get(sid)?.telemetry?.remaining_charges || 0) || 0; charges[sid] = rc; total += rc; });
+            const pixelsPerBatch = Number((this.guardConfig?.pixelsPerBatch) ?? 10) || 10;
+            const spendAll = !!this.guardConfig?.spendAllPixelsOnStart;
+            let roundTotal = spendAll ? total : Math.min(total, pixelsPerBatch);
+            if (roundTotal <= 0) {
+              selectedIds.forEach(sid => this.updateSlaveCardQuota(sid, 0, 0));
+              this.currentRoundPlan = {};
+              return;
+            }
+            const plan:any = {}; selectedIds.forEach(sid => plan[sid] = 0);
+            const order = selectedIds.filter(sid => (charges[sid] || 0) > 0);
+            let i = 0, assigned = 0;
+            while (assigned < roundTotal && order.length) {
+              const sid = order[i % order.length];
+              if (plan[sid] < charges[sid]) { plan[sid] += 1; assigned += 1; }
+              i++;
+              if (assigned < roundTotal && order.every(s => plan[s] >= charges[s])) break;
+            }
+            const changes = (this.lastPreviewData && Array.isArray(this.lastPreviewData.changes)) ? this.lastPreviewData.changes : [];
+            const excluded = (this.guardConfig?.excludeColor && Array.isArray(this.guardConfig?.excludedColorIds)) ? new Set(this.guardConfig.excludedColorIds) : new Set();
+            const eligible = changes.filter(c => (c?.type === 'missing' || c?.type === 'absent') && !excluded.has(c?.expectedColor ?? c?.color ?? -1));
+            const maxAssignable = eligible.length;
+            const planSum = Object.values(plan).reduce((a:any,b:any)=>a+b,0);
+            let finalPlan = { ...plan } as any;
+            if (maxAssignable < planSum) {
+              const rr: string[] = [];
+              Object.entries(plan).forEach(([sid, count]: any) => { for (let k=0;k<count;k++) rr.push(sid as string); });
+              const take = rr.slice(0, maxAssignable);
+              finalPlan = {}; selectedIds.forEach(sid => finalPlan[sid] = 0);
+              take.forEach(sid => finalPlan[sid] += 1);
+            }
+            selectedIds.forEach(sid => {
+              const val = finalPlan[sid] || 0; const cap = Math.max(1, charges[sid] || 0);
+              this.updateSlaveCardQuota(sid, val, val / cap);
+            });
+            this.slaves.forEach((_, sid) => { if (!selectedIds.includes(sid)) this.updateSlaveCardQuota(sid, 0, 0); });
+            this.currentRoundPlan = finalPlan;
+          } catch(e){ this.log('⚠️ Recompute plan error: '+ (e?.message || e)); }
+        }
+
+        updateOverallProgressBar(accuracyPercentNumber:number){
+          try{
+            const pct = Math.max(0, Math.min(100, Number(accuracyPercentNumber) || 0));
+            const bar = document.getElementById('overall-progress-bar');
+            const lbl = document.getElementById('overall-progress-label');
+            if (bar) (bar as HTMLElement).style.width = `${pct}%`;
+            if (lbl) lbl.textContent = `${pct.toFixed(1)}%`;
+          }catch{}
+        }
+
+        requestPreviewRefreshThrottle(){
+          try{
+            const now = Date.now();
+            if (now < (this._previewRefreshCooldownUntil || 0)) return;
+            this._previewRefreshCooldownUntil = now + 4000;
+            fetch(`${this.apiBase()}/api/guard/check`, { method: 'POST' }).catch(()=>{});
+          }catch{}
+        }
+      }
+
+      // Initialize dashboard when page loads
+      document.addEventListener('DOMContentLoaded', () => {
+        new WPlaceDashboard();
+      });
+    </script>
+  </body>
+</html>

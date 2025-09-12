@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "8008:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://wplace:wplace123@postgres:5432/wplace_master
+      # NOTE: La aplicación esperaba quizá 'wplace'. init.sql ya crea la DB 'wplace' para compatibilidad.
+    depends_on:
+      - redis
+      - postgres
+    volumes:
+      - ./server:/app
+    networks:
+      - wplace-network
+    restart: unless-stopped
+
+  ui:
+    build:
+      context: ./ui
+      dockerfile: Dockerfile
+    ports:
+      - "3004:3000"
+    depends_on:
+      - server
+    networks:
+      - wplace-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - wplace-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=wplace_master
+      - POSTGRES_USER=wplace
+      - POSTGRES_PASSWORD=wplace123
+      # Si quieres que el contenedor arranque directamente sobre 'wplace' cambia POSTGRES_DB, pero mantenemos wplace_master y scripts crean 'wplace'.
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./init-extra.sql:/docker-entrypoint-initdb.d/10-init-extra.sql
+    networks:
+      - wplace-network
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  postgres_data:
+
+networks:
+  wplace-network:
+    driver: bridge
