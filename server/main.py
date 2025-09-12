@@ -84,7 +84,8 @@ guard_config: Dict[str, Any] = {
     "watchMode": True,  # por defecto sólo observar
     "colorThreshold": 10,
     "autoDistribute": False,  # nuevo: permitir distribución automática desde UI futura
-    "colorComparisonMethod": "rgb"  # nuevo: 'rgb' o 'lab'
+    "colorComparisonMethod": "rgb",  # nuevo: 'rgb' o 'lab'
+    "recentLockSeconds": 60,  # nuevo: TTL de bloqueo tras pintar (segundos)
 }
 websocket_connections: Dict[str, WebSocket] = {}
 ui_connections: List[WebSocket] = []
@@ -94,9 +95,10 @@ last_guard_upload: Optional[Dict[str, Any]] = None
 # Selección de slaves a nivel UI (persistente en memoria; usado como default cross-device)
 ui_selected_slaves: List[str] = []
 
-# Píxeles recientemente reparados (para evitar repintar mientras no llega preview fresco)
-RECENT_PREVIEW_TTL = 5  # considerar reparado durante 5 previews del favorito
-recently_repaired: Dict[str, int] = {}
+# Píxeles recientemente reparados (para evitar repintar durante un periodo fijo de tiempo)
+# Antes: basado en número de previews (TTL=5). Ahora: basado en tiempo (60 segundos).
+RECENT_LOCK_SECONDS = 60  # valor por defecto; se puede sobrescribir con guard_config['recentLockSeconds']
+recently_repaired: Dict[str, float] = {}  # almacena epoch de expiración (segundos)
 _recent_lock = Lock()
 
 def _mk_key(x: Any, y: Any) -> str:
@@ -106,22 +108,25 @@ def _mk_key(x: Any, y: Any) -> str:
         return f"{x},{y}"
 
 def mark_recent_repairs(coords: List[Dict[str, Any]]):
+    """Marcar coordenadas como bloqueadas hasta ahora + RECENT_LOCK_SECONDS."""
     if not coords:
         return
+    now = datetime.utcnow().timestamp()
+    # Permitir override por config
+    try:
+        lock_secs = float(guard_config.get('recentLockSeconds', RECENT_LOCK_SECONDS))
+    except Exception:
+        lock_secs = float(RECENT_LOCK_SECONDS)
     with _recent_lock:
         for p in coords:
             k = _mk_key(p.get('x'), p.get('y'))
-            recently_repaired[k] = RECENT_PREVIEW_TTL
+            recently_repaired[k] = now + lock_secs
 
 def age_recent_repairs():
+    """Limpia entradas expiradas según tiempo actual."""
+    now = datetime.utcnow().timestamp()
     with _recent_lock:
-        to_del = []
-        for k, v in recently_repaired.items():
-            nv = int(v) - 1
-            if nv <= 0:
-                to_del.append(k)
-            else:
-                recently_repaired[k] = nv
+        to_del = [k for k, exp in recently_repaired.items() if float(exp) <= now]
         for k in to_del:
             try:
                 del recently_repaired[k]
@@ -129,14 +134,25 @@ def age_recent_repairs():
                 pass
 
 def is_locked_change(change: Dict[str, Any]) -> bool:
-    # change es un dict con x,y
+    """Devuelve True si la coord está bloqueada aún (no ha expirado). Limpia expirados on-the-fly."""
     try:
         x = change.get('x'); y = change.get('y')
         if x is None or y is None:
             return False
         k = _mk_key(x, y)
+        now = datetime.utcnow().timestamp()
         with _recent_lock:
-            return bool(recently_repaired.get(k, 0) > 0)
+            exp = recently_repaired.get(k)
+            if not exp:
+                return False
+            if float(exp) <= now:
+                # Expirado: limpiar y no bloquear
+                try:
+                    del recently_repaired[k]
+                except Exception:
+                    pass
+                return False
+            return True
     except Exception:
         return False
 
@@ -460,6 +476,7 @@ class GuardConfigUpdate(BaseModel):
     colorThreshold: Optional[int] = None
     autoDistribute: Optional[bool] = None
     colorComparisonMethod: Optional[str] = None  # 'rgb' | 'lab'
+    recentLockSeconds: Optional[int] = None  # TTL de bloqueo tras pintar (segundos)
 
 @app.post("/api/guard/config")
 async def update_guard_config(cfg: GuardConfigUpdate):

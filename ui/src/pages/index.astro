@@ -857,10 +857,7 @@ import PreviewPanel from "../components/PreviewPanel.astro";
           // Modal legacy removed: no guard config button needed
           
           // Preview panel controls
-          const closePreviewBtn = document.getElementById('close-preview');
-          if (closePreviewBtn) {
-            closePreviewBtn.addEventListener('click', () => this.hidePreviewPanel());
-          }
+          // Botón cerrar eliminado: el panel de preview ya no se puede cerrar
           
           const fitZoomBtn = document.getElementById('fit-zoom');
           if (fitZoomBtn) {
@@ -1682,6 +1679,7 @@ import PreviewPanel from "../components/PreviewPanel.astro";
               ['gc-autoDistribute','autoDistribute','checkbox'],
               ['gc-minChargesToWait','minChargesToWait'],
               ['gc-pixelsPerBatch','pixelsPerBatch'],
+              ['gc-recentLockSeconds','recentLockSeconds'],
               ['gc-randomWaitMin','randomWaitMin'],
               ['gc-randomWaitMax','randomWaitMax'],
               ['gc-colorThreshold','colorThreshold']
@@ -1692,6 +1690,12 @@ import PreviewPanel from "../components/PreviewPanel.astro";
               if(type==='checkbox') el.checked = !!(cfg as any)[key]; 
               else if((cfg as any)[key]!==undefined) el.value = (cfg as any)[key]; 
             });
+            // Mostrar/ocultar tiempos aleatorios según toggle
+            try {
+              const rt = document.getElementById('gc-randomWaitTime') as HTMLInputElement | null;
+              const times = document.getElementById('gc-random-times') as HTMLElement | null;
+              if (times) times.style.display = (rt && rt.checked) ? '' : 'none';
+            } catch {}
           }
 
           async saveGuardConfig(){
@@ -1706,6 +1710,7 @@ import PreviewPanel from "../components/PreviewPanel.astro";
               ['gc-autoDistribute','autoDistribute','checked'],
               ['gc-minChargesToWait','minChargesToWait','value','int'],
               ['gc-pixelsPerBatch','pixelsPerBatch','value','int'],
+              ['gc-recentLockSeconds','recentLockSeconds','value','int'],
               ['gc-randomWaitMin','randomWaitMin','value','float'],
               ['gc-randomWaitMax','randomWaitMax','value','float'],
               ['gc-colorThreshold','colorThreshold','value','int']
@@ -1756,7 +1761,13 @@ import PreviewPanel from "../components/PreviewPanel.astro";
           wireToggle('gc-spendAllPixelsOnStart', undefined, () => { try{ this.recomputeRoundPlan(); }catch{} });
           wireToggle('gc-autoDistribute');
           wireToggle('gc-watchMode');
-          wireToggle('gc-randomWaitTime');
+          wireToggle('gc-randomWaitTime', undefined, () => {
+            try {
+              const rt = document.getElementById('gc-randomWaitTime') as HTMLInputElement | null;
+              const times = document.getElementById('gc-random-times') as HTMLElement | null;
+              if (times) times.style.display = (rt && rt.checked) ? '' : 'none';
+            } catch {}
+          });
 
           // Botones guardar / reset
           const resetBtn = document.getElementById('gc-reset-btn');
@@ -1858,6 +1869,7 @@ import PreviewPanel from "../components/PreviewPanel.astro";
             ['gc-autoDistribute','autoDistribute','checked'],
             ['gc-minChargesToWait','minChargesToWait','value','int'],
             ['gc-pixelsPerBatch','pixelsPerBatch','value','int'],
+            ['gc-recentLockSeconds','recentLockSeconds','value','int'],
             ['gc-randomWaitMin','randomWaitMin','value','float'],
             ['gc-randomWaitMax','randomWaitMax','value','float'],
             ['gc-colorThreshold','colorThreshold','value','int']

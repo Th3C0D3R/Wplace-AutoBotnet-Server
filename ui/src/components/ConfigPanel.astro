@@ -101,12 +101,18 @@
         <input type="number" id="gc-pixelsPerBatch" min="1" class="w-full p-2 border rounded-md bg-background text-foreground" />
       </div>
       <div>
-        <label class="block text-sm font-medium mb-2 text-card-foreground">Tiempo mínimo (s)</label>
-        <input type="number" id="gc-randomWaitMin" step="0.1" min="0" class="w-full p-2 border rounded-md bg-background text-foreground" />
+        <label class="block text-sm font-medium mb-2 text-card-foreground">Bloqueo tras pintar (s)</label>
+        <input type="number" id="gc-recentLockSeconds" min="0" class="w-full p-2 border rounded-md bg-background text-foreground" />
       </div>
-      <div>
-        <label class="block text-sm font-medium mb-2 text-card-foreground">Tiempo máximo (s)</label>
-        <input type="number" id="gc-randomWaitMax" step="0.1" min="0" class="w-full p-2 border rounded-md bg-background text-foreground" />
+      <div id="gc-random-times" class="contents">
+        <div>
+          <label class="block text-sm font-medium mb-2 text-card-foreground">Tiempo mínimo (s)</label>
+          <input type="number" id="gc-randomWaitMin" step="0.1" min="0" class="w-full p-2 border rounded-md bg-background text-foreground" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-2 text-card-foreground">Tiempo máximo (s)</label>
+          <input type="number" id="gc-randomWaitMax" step="0.1" min="0" class="w-full p-2 border rounded-md bg-background text-foreground" />
+        </div>
       </div>
       <div>
         <label class="block text-sm font-medium mb-2 text-card-foreground">Umbral de color</label>

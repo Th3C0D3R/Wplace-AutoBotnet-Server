@@ -4,40 +4,16 @@
 
 <div id="preview-panel" class="bg-card border rounded-lg p-0 mt-6 w-full" style="display: none;">
   <!-- Header -->
-  <div class="flex items-center justify-between p-4 bg-slate-800 rounded-t-lg border-b border-slate-600 select-none">
+  <div class="flex items-center justify-start p-4 bg-slate-800 rounded-t-lg border-b border-slate-600 select-none">
     <h2 class="text-lg font-semibold text-card-foreground flex items-center gap-2">
       🔍 <span>Project Preview</span>
     </h2>
-    <button id="close-preview" class="text-muted-foreground hover:text-foreground text-lg">✕</button>
   </div>
   
   <!-- Main content -->
   <div class="flex w-full" id="preview-content">
     <!-- Left panel - Controls (minimized) -->
     <div class="w-64 bg-slate-800 p-4 border-r border-slate-600 overflow-y-auto flex-shrink-0">
-      <!-- Statistics -->
-      <div class="bg-slate-700 rounded-lg p-3 mb-4">
-        <h3 class="text-sm font-semibold text-blue-400 mb-2">📊 Estadísticas</h3>
-        <div class="space-y-1 text-xs">
-          <div class="flex justify-between">
-            <span class="text-green-400">✅ Correctos:</span>
-            <span id="preview-correct-count" class="font-bold">-</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-red-400">❌ Incorrectos:</span>
-            <span id="preview-incorrect-count" class="font-bold">-</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-yellow-400">⚪ Faltantes:</span>
-            <span id="preview-missing-count" class="font-bold">-</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-purple-400">🎯 Precisión:</span>
-            <span id="preview-accuracy" class="font-bold">-</span>
-          </div>
-        </div>
-      </div>
-
       <!-- Visualization Controls -->
       <div class="bg-slate-700 rounded-lg p-3 mb-4">
         <h3 class="text-sm font-semibold text-blue-400 mb-2">🎨 Visualización</h3>
