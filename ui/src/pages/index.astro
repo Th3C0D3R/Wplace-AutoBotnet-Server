@@ -117,6 +117,7 @@ import PreviewPanel from "../components/PreviewPanel.astro";
         chargeUpdateInterval: any;
         chargeCountdown: number;
         currentProject: any;
+        activeProject: any; // alias legacy para limpieza
         previewZoom: number;
         detectedBotMode: string | null;
         projectConfig: any;
@@ -124,6 +125,8 @@ import PreviewPanel from "../components/PreviewPanel.astro";
         autoDistribute: boolean;
         lastPreviewData: any; // added
   guardPreview: any; // added preview state
+        previewChanges: any[]; // listado filtrado actual
+        previewMeta: any; // metadatos adicionales
         lastPreviewAt: number; // throttle preview
         recentLogKeys: Map<string, number>; // dedupe keys with TTL
         awaitingOneBatchToast: boolean;
@@ -146,6 +149,7 @@ import PreviewPanel from "../components/PreviewPanel.astro";
           this.chargeUpdateInterval = null;
           this.chargeCountdown = 30;
           this.currentProject = null;
+          this.activeProject = null;
           this.previewZoom = 1;
           this.detectedBotMode = null;
           this.projectConfig = null;
@@ -153,6 +157,8 @@ import PreviewPanel from "../components/PreviewPanel.astro";
           this.autoDistribute = false;
           this.lastPreviewData = null; // init
           this.guardPreview = { analysis:null, togglesInitialized:false, show:{correct:true, incorrect:true, missing:true}, area:null };
+          this.previewChanges = [];
+          this.previewMeta = {};
           this.lastPreviewAt = 0;
           this.recentLogKeys = new Map();
           this.awaitingOneBatchToast = false;
@@ -185,6 +191,22 @@ import PreviewPanel from "../components/PreviewPanel.astro";
           // Estado inicial de controles: sin slaves => deshabilitar botones dependientes
           try { this.updateControlButtons(); } catch {}
       try { this.updateConfigPanelEnabledState(); } catch {}
+        }
+
+        renderPreview(){
+          // Método mínimo: si no hay datos limpiar canvas y stats
+          try {
+            const canvas = document.getElementById('preview-canvas') as HTMLCanvasElement | null;
+            const ctx = canvas?.getContext('2d');
+            if (!canvas || !ctx){ return; }
+            if(!this.lastPreviewData){
+              ctx.clearRect(0,0,canvas.width,canvas.height);
+              const stats = document.getElementById('guard-preview-stats');
+              if(stats) stats.textContent = 'Sin datos';
+              return;
+            }
+            // Si existe una imagen previa mantener (renderizado detallado está en otra parte del código que no tocamos).
+          } catch {}
         }
 
   // Stubs (ya existían en versión previa del archivo, se redefinen si faltan)
@@ -317,9 +339,22 @@ import PreviewPanel from "../components/PreviewPanel.astro";
           
           this.ws.onmessage = (event) => {
             try {
-              const message = JSON.parse(event.data);
-              this.logOnce(`ws:${message.type}`, `📨 Received WebSocket message: ${message.type}`, 1200);
-              this.handleWebSocketMessage(message);
+                  const raw = JSON.parse(event.data);
+                  const unwrapResult = this._maybeUnwrapCompressed(raw);
+                  const processMessages = (val) => {
+                    if (!val) return;
+                    const list = Array.isArray(val) ? val : [val];
+                    for (const m of list) {
+                      if (!m) continue;
+                      this.logOnce(`ws:${m.type}`, `📨 Received WebSocket message: ${m.type}`, 1200);
+                      this.handleWebSocketMessage(m);
+                    }
+                  };
+                  if (unwrapResult && typeof unwrapResult.then === 'function') {
+                    unwrapResult.then(processed => processMessages(processed));
+                  } else {
+                    processMessages(unwrapResult);
+                  }
             } catch (error) {
               this.log(`❌ Error parsing WebSocket message: ${error.message}`);
             }
@@ -340,6 +375,20 @@ import PreviewPanel from "../components/PreviewPanel.astro";
           this.logOnce(`proc:${message.type}`, `🔄 Processing message type: ${message.type}`, 1200);
           
           switch (message.type) {
+            case 'projects_cleared':
+              this.log('🧹 Proyecto(s) limpiado(s)');
+              try {
+                const statusEl = document.getElementById('file-status'); if (statusEl) statusEl.textContent = 'No file selected';
+                this.activeProject = null; this.projectConfig = null; this.detectedBotMode = null;
+                this.lastPreviewData = null; this.previewChanges = []; this.previewMeta = {};
+                this.guardPreview = { analysis:null, togglesInitialized:false, show:{correct:true, incorrect:true, missing:true}, area:null };
+                const panel = document.getElementById('preview-panel') as HTMLElement | null; if (panel) panel.style.display = 'none';
+                ['repaired-pixels','incorrect-pixels','missing-pixels'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent='0'; });
+                try { localStorage.removeItem('previewPanel.height'); } catch {}
+                this.updateControlButtons();
+              } catch{}
+              this.renderPreview();
+              break;
             case 'initial_state':
               this.log(`📋 Initial state received with ${(message.slaves || []).length} slaves`);
               this.updateSlavesList(message.slaves || []);
@@ -608,6 +657,10 @@ import PreviewPanel from "../components/PreviewPanel.astro";
                 ['repaired-pixels','incorrect-pixels','missing-pixels'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent='0'; });
                 this.awaitingOneBatchToast = false;
               } catch {}
+              break;
+            case 'guard_upload_sent':
+              // Ack desde el servidor confirmando que el upload de guard fue reenviado al slave favorito
+              this.log(`📤 Guard upload ACK → fav=${message.sent_to || message.slave_id || 'n/a'} size=${message.originalLength || message.size || 'n/a'} compressed=${message.compressedLength || 'n/a'}`);
               break;
             
             default:
@@ -1021,24 +1074,24 @@ import PreviewPanel from "../components/PreviewPanel.astro";
 
         async clearProject(){
           try {
-            await fetch(`${this.apiBase()}/api/guard/clear`, { method: 'POST' });
-            // Pedir al slave favorito que pare y quede en idle/watch off y siga emitiendo métricas
-            try { await fetch(`${this.apiBase()}/api/guard/stop`, { method: 'POST' }); } catch {}
-            try { await fetch(`${this.apiBase()}/api/guard/toggle-watch`, { method: 'POST' }); } catch {}
-          } catch (e) {
-            this.log(`⚠️ Error calling /api/guard/clear: ${e?.message || e}`);
+            const r = await fetch(`${this.apiBase()}/api/projects/clear-all`, { method: 'POST' });
+            if(!r.ok) throw new Error(`HTTP ${r.status}`);
+            this.log('🧹 Limpieza global solicitada');
+          } catch(e){
+            this.log(`⚠️ Error calling /api/projects/clear-all: ${e?.message || e}`);
           }
-          // Reset UI state
-          const fileInput = document.getElementById('project-file') as HTMLInputElement | null; if (fileInput) fileInput.value = '';
-          const statusEl = document.getElementById('file-status'); if (statusEl) statusEl.textContent = 'No file selected';
-          const detectedEl = document.getElementById('detected-mode'); if (detectedEl) detectedEl.textContent = 'No file loaded - mode will be auto-detected';
-          const analysisEl = document.getElementById('file-analysis'); if (analysisEl) (analysisEl as HTMLElement).style.display = 'none';
-          this.projectConfig = null; this.detectedBotMode = null; this.lastPreviewData = null; this.guardPreview = { analysis:null, togglesInitialized:false, show:{correct:true, incorrect:true, missing:true}, area:null };
-          const panel = document.getElementById('preview-panel') as HTMLElement | null; if (panel) panel.style.display = 'none';
-          ['repaired-pixels','incorrect-pixels','missing-pixels'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent='0'; });
-          try { localStorage.removeItem('previewPanel.height'); } catch {}
-          this.updateControlButtons();
-          this.log('🧹 Proyecto y preview limpiados');
+          // Reset inmediato local
+          try {
+            const statusEl = document.getElementById('file-status'); if (statusEl) statusEl.textContent = 'No file selected';
+            this.activeProject = null; this.projectConfig = null; this.detectedBotMode = null;
+            this.lastPreviewData = null; this.previewChanges = []; this.previewMeta = {};
+            this.guardPreview = { analysis:null, togglesInitialized:false, show:{correct:true, incorrect:true, missing:true}, area:null };
+            const panel = document.getElementById('preview-panel') as HTMLElement | null; if (panel) panel.style.display = 'none';
+            ['repaired-pixels','incorrect-pixels','missing-pixels'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent='0'; });
+            try { localStorage.removeItem('previewPanel.height'); } catch {}
+            this.updateControlButtons();
+          } catch {}
+          this.renderPreview();
         }
 
         createToggle(id, labelText, checked = false) {
@@ -1675,8 +1728,7 @@ import PreviewPanel from "../components/PreviewPanel.astro";
               ['gc-excludeColor','excludeColor','checkbox'],
               ['gc-spendAllPixelsOnStart','spendAllPixelsOnStart','checkbox'],
               ['gc-randomWaitTime','randomWaitTime','checkbox'],
-              ['gc-watchMode','watchMode','checkbox'],
-              ['gc-autoDistribute','autoDistribute','checkbox'],
+              // removed watchMode & autoDistribute
               ['gc-minChargesToWait','minChargesToWait'],
               ['gc-pixelsPerBatch','pixelsPerBatch'],
               ['gc-recentLockSeconds','recentLockSeconds'],
@@ -1706,8 +1758,7 @@ import PreviewPanel from "../components/PreviewPanel.astro";
               ['gc-excludeColor','excludeColor','checked'],
               ['gc-spendAllPixelsOnStart','spendAllPixelsOnStart','checked'],
               ['gc-randomWaitTime','randomWaitTime','checked'],
-              ['gc-watchMode','watchMode','checked'],
-              ['gc-autoDistribute','autoDistribute','checked'],
+              // removed watchMode & autoDistribute
               ['gc-minChargesToWait','minChargesToWait','value','int'],
               ['gc-pixelsPerBatch','pixelsPerBatch','value','int'],
               ['gc-recentLockSeconds','recentLockSeconds','value','int'],
@@ -1759,8 +1810,7 @@ import PreviewPanel from "../components/PreviewPanel.astro";
           wireToggle('gc-preferColor','gc-preferredColors-section');
           wireToggle('gc-excludeColor','gc-excludedColors-section');
           wireToggle('gc-spendAllPixelsOnStart', undefined, () => { try{ this.recomputeRoundPlan(); }catch{} });
-          wireToggle('gc-autoDistribute');
-          wireToggle('gc-watchMode');
+          // removed toggles wireToggle for autoDistribute & watchMode
           wireToggle('gc-randomWaitTime', undefined, () => {
             try {
               const rt = document.getElementById('gc-randomWaitTime') as HTMLInputElement | null;
@@ -1865,8 +1915,7 @@ import PreviewPanel from "../components/PreviewPanel.astro";
             ['gc-excludeColor','excludeColor','checked'],
             ['gc-spendAllPixelsOnStart','spendAllPixelsOnStart','checked'],
             ['gc-randomWaitTime','randomWaitTime','checked'],
-            ['gc-watchMode','watchMode','checked'],
-            ['gc-autoDistribute','autoDistribute','checked'],
+            // removed watchMode & autoDistribute
             ['gc-minChargesToWait','minChargesToWait','value','int'],
             ['gc-pixelsPerBatch','pixelsPerBatch','value','int'],
             ['gc-recentLockSeconds','recentLockSeconds','value','int'],
@@ -1921,6 +1970,46 @@ import PreviewPanel from "../components/PreviewPanel.astro";
           container.appendChild(logEntry);
           container.scrollTop = container.scrollHeight;
           while (container.children.length > 200) { container.removeChild(container.firstChild); }
+        }
+
+        // ===== Compresión / Descompresión UI =====
+        _maybeUnwrapCompressed(obj){
+          try {
+            if (!obj || typeof obj !== 'object') return obj;
+            if (obj.type !== '__compressed__') return obj;
+            if (!obj.encoding || obj.encoding !== 'gzip+base64') return obj;
+            // Lazy load pako solo cuando se necesita (parcel/astro soporta dynamic import)
+            const b64 = obj.payload;
+            if (typeof b64 !== 'string') return obj; // corrupto
+            const binStr = atob(b64);
+            const len = binStr.length;
+            const bytes = new Uint8Array(len);
+            for (let i=0;i<len;i++) bytes[i] = binStr.charCodeAt(i);
+            // Utilizamos pako ungzip
+            // Nota: import dinámico; si falla, retornamos wrapper original para no romper flujo
+            return this._gunzip(bytes).then(js => {
+              // Si el wrapper traía originalType, y el contenido es objeto sin type, reinyectar
+              if (obj.originalType && js && typeof js === 'object' && !js.type) {
+                js.type = obj.originalType;
+              }
+              return js;
+            }).catch(err => {
+              this.log('⚠️ Decompression failed: '+ (err?.message || err));
+              return obj; // fallback
+            });
+          } catch(e){
+            this.log('⚠️ _maybeUnwrapCompressed error: '+ (e?.message || e));
+            return obj;
+          }
+        }
+
+        async _gunzip(bytes){
+          const { ungzip } = await import('pako');
+            const decompressed = ungzip(bytes, { to: 'string' });
+            const parsed = JSON.parse(decompressed);
+            // Para mantener compat, si viene single object lo devolvemos; si es wrapper with originalType, homogenizar
+            if (parsed && typeof parsed === 'object' && parsed.type && parsed.type !== '__compressed__') return parsed;
+            return parsed;
         }
 
         // Dedupe helper with TTL

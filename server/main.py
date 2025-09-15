@@ -4,6 +4,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Dict, List, Optional, Any
 import json
+import gzip
+import base64
 import asyncio
 import uuid
 from datetime import datetime
@@ -22,6 +24,62 @@ from sqlalchemy.exc import SQLAlchemyError
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+COMPRESSION_THRESHOLD = 20 * 1024 * 1024  # 20MB (bytes)
+# Tipos que nunca deben comprimirse (órdenes de pintado / control latencia-crítica)
+NO_COMPRESS_TYPES = {
+    'paintBatch',
+    'repairOrder'
+}
+
+def _compress_if_needed(message: dict) -> str:
+    """Devuelve JSON (posiblemente envuelto y comprimido) listo para send_text.
+    Wrapper: { type: '__compressed__', encoding: 'gzip+base64', originalType, originalLength, compressedLength, payload }
+    """
+    try:
+        if not isinstance(message, dict) or message.get('type') == '__compressed__':
+            return json.dumps(message)
+        # Saltar compresión para tipos críticos
+        if message.get('type') in NO_COMPRESS_TYPES:
+            return json.dumps(message, separators=(',', ':'), ensure_ascii=False)
+        raw = json.dumps(message, separators=(',', ':'), ensure_ascii=False).encode('utf-8')
+        if len(raw) < COMPRESSION_THRESHOLD:
+            return raw.decode('utf-8')
+        comp = gzip.compress(raw)
+        b64 = base64.b64encode(comp).decode('ascii')
+        wrapper = {
+            'type': '__compressed__',
+            'encoding': 'gzip+base64',
+            'originalType': message.get('type'),
+            'originalLength': len(raw),
+            'compressedLength': len(b64),
+            'payload': b64
+        }
+        return json.dumps(wrapper, separators=(',', ':'), ensure_ascii=False)
+    except Exception as e:
+        logger.error(f"Compression error: {e}")
+        try:
+            return json.dumps(message)
+        except Exception:
+            return '{}'
+
+def _try_decompress(message: dict) -> dict:
+    """Si el dict es un wrapper comprimido lo descomprime, si no lo deja igual."""
+    try:
+        if not isinstance(message, dict):
+            return message
+        if message.get('type') != '__compressed__' or message.get('encoding') != 'gzip+base64':
+            return message
+        b64 = message.get('payload')
+        if not isinstance(b64, str):
+            return message
+        raw = base64.b64decode(b64)
+        decompressed = gzip.decompress(raw)
+        inner = json.loads(decompressed.decode('utf-8'))
+        return inner
+    except Exception as e:
+        logger.error(f"Decompression failed: {e}")
+        return message
 
 app = FastAPI(title="WPlace Master Server", version="1.0.0")
 
@@ -83,9 +141,7 @@ guard_config: Dict[str, Any] = {
     "randomWaitTime": False,
     "randomWaitMin": 5,
     "randomWaitMax": 15,
-    "watchMode": True,  # por defecto sólo observar
     "colorThreshold": 10,
-    "autoDistribute": False,  # nuevo: permitir distribución automática desde UI futura
     "colorComparisonMethod": "rgb",  # nuevo: 'rgb' o 'lab'
     "recentLockSeconds": 60,  # nuevo: TTL de bloqueo tras pintar (segundos)
 }
@@ -646,22 +702,20 @@ class ConnectionManager:
                 logger.info(f"Slave {slave_id} connected and set as favorite (first slave)")
                 # Enviar configuración guard actual al favorito
                 try:
-                    await self.slave_connections[slave_id].send_text(json.dumps({
-                        "type": "guardConfig",
-                        "config": guard_config,
-                        "timestamp": datetime.utcnow().isoformat()
-                    }))
+                    payload = {"type": "guardConfig", "config": guard_config, "timestamp": datetime.utcnow().isoformat()}
+                    await self.slave_connections[slave_id].send_text(_compress_if_needed(payload))
                 except Exception as _e:
                     logger.error(f"Error sending guard config to first favorite {slave_id}: {_e}")
                 # Enviar guardData si existe para continuar preview
                 try:
                     if last_guard_upload:
-                        await self.slave_connections[slave_id].send_text(json.dumps({
+                        payload = {
                             "type": "guardData",
                             "filename": last_guard_upload.get("filename", "uploaded_guard.json"),
                             "guardData": last_guard_upload.get("data", {}),
                             "timestamp": datetime.utcnow().isoformat()
-                        }))
+                        }
+                        await self.slave_connections[slave_id].send_text(_compress_if_needed(payload))
                 except Exception as _e:
                     logger.error(f"Error sending guardData to first favorite {slave_id}: {_e}")
             else:
@@ -674,22 +728,20 @@ class ConnectionManager:
             # Si es favorito al reconectar, reenviar config guard
             if connected_slaves[slave_id].is_favorite:
                 try:
-                    await self.slave_connections[slave_id].send_text(json.dumps({
-                        "type": "guardConfig",
-                        "config": guard_config,
-                        "timestamp": datetime.utcnow().isoformat()
-                    }))
+                    payload = {"type": "guardConfig", "config": guard_config, "timestamp": datetime.utcnow().isoformat()}
+                    await self.slave_connections[slave_id].send_text(_compress_if_needed(payload))
                 except Exception as _e:
                     logger.error(f"Error re-sending guard config to favorite {slave_id}: {_e}")
                 # También re-enviar guardData si existe
                 try:
                     if last_guard_upload:
-                        await self.slave_connections[slave_id].send_text(json.dumps({
+                        payload = {
                             "type": "guardData",
                             "filename": last_guard_upload.get("filename", "uploaded_guard.json"),
                             "guardData": last_guard_upload.get("data", {}),
                             "timestamp": datetime.utcnow().isoformat()
-                        }))
+                        }
+                        await self.slave_connections[slave_id].send_text(_compress_if_needed(payload))
                 except Exception as _e:
                     logger.error(f"Error re-sending guardData to favorite {slave_id}: {_e}")
 
@@ -744,7 +796,7 @@ class ConnectionManager:
     async def send_to_slave(self, slave_id: str, message: dict):
         if slave_id in self.slave_connections:
             try:
-                await self.slave_connections[slave_id].send_text(json.dumps(message))
+                await self.slave_connections[slave_id].send_text(_compress_if_needed(message))
             except Exception as e:
                 logger.error(f"Error sending to slave {slave_id}: {e}")
                 await self.disconnect_slave(slave_id)
@@ -753,7 +805,8 @@ class ConnectionManager:
         disconnected = []
         for connection in self.ui_connections:
             try:
-                await connection.send_text(json.dumps(message))
+                # Suponemos que la UI no necesita recibir >20MB; aun así aplicamos compresión defensiva
+                await connection.send_text(_compress_if_needed(message))
             except Exception as e:
                 logger.error(f"Error broadcasting to UI: {e}")
                 disconnected.append(connection)
@@ -805,9 +858,7 @@ class GuardConfigUpdate(BaseModel):
     randomWaitTime: Optional[bool] = None
     randomWaitMin: Optional[float] = None
     randomWaitMax: Optional[float] = None
-    watchMode: Optional[bool] = None
     colorThreshold: Optional[int] = None
-    autoDistribute: Optional[bool] = None
     colorComparisonMethod: Optional[str] = None  # 'rgb' | 'lab'
     recentLockSeconds: Optional[int] = None  # TTL de bloqueo tras pintar (segundos)
 
@@ -961,7 +1012,6 @@ async def guard_get_preview():
 class GuardRepairRequest(BaseModel):
     limit: Optional[int] = 0  # 0 = usar config
     pattern: Optional[str] = None
-    watchMode: Optional[bool] = None
 
 @app.post("/api/guard/repair")
 async def guard_force_repair(req: GuardRepairRequest):
@@ -990,25 +1040,10 @@ async def guard_stop():
             return {"ok": True, "requested": None, "skipped": "no_slave_connected"}
     # Señal general de control stop
     await manager.send_to_slave(target_id, { "type": "control", "action": "stop" })
-    # También desactivar watch si estuviera corriendo (best-effort)
-    try:
-        await manager.send_to_slave(target_id, { "type": "guardControl", "action": "toggleWatch" })
-    except Exception:
-        pass
+    # watchMode eliminado: no se envía toggleWatch
     return {"ok": True, "requested": target_id}
 
-@app.post("/api/guard/toggle-watch")
-async def guard_toggle_watch():
-    fav_id = next((sid for sid, s in connected_slaves.items() if getattr(s, 'is_favorite', False)), None)
-    target_id = fav_id
-    if not target_id:
-        if connected_slaves:
-            target_id = next(iter(connected_slaves.keys()))
-            logger.warning(f"[GUARD TOGGLE WATCH] No favorite slave; usando fallback {target_id}")
-        else:
-            return {"ok": True, "requested": None, "skipped": "no_slave_connected"}
-    await manager.send_to_slave(target_id, {"type": "guardControl", "action": "toggleWatch"})
-    return {"ok": True, "requested": target_id}
+## Endpoint toggle-watch eliminado (watchMode deprecado)
 
 @app.post("/api/slaves/{slave_id}/favorite")
 async def set_favorite_slave(slave_id: str):
@@ -1161,157 +1196,145 @@ async def start_session(session_id: str):
     async def orchestrate_loop():
         try:
             while active_protect_loops.get(session_id, {}).get('running'):
-                # Recopilar slaves válidos dinámicamente (sesión ∩ conectados)
-                current_valid_slaves = [sid for sid in session.slave_ids if sid in connected_slaves]
-                if not current_valid_slaves:
-                    await asyncio.sleep(3)
-                    continue
-                # 2) Preview del favorito
-                fav_id = next((sid for sid, s in connected_slaves.items() if getattr(s, 'is_favorite', False)), None)
-                if fav_id:
-                    old_ts = _last_preview_timestamp.get(fav_id, 0)
-                    await manager.send_to_slave(fav_id, {"type": "guardControl", "action": "check"})
-                    for _ in range(20):
-                        await asyncio.sleep(0.25)
-                        if _last_preview_timestamp.get(fav_id, 0) > old_ts:
+                try:
+                    # 1. Slaves válidos
+                    current_valid_slaves = [sid for sid in session.slave_ids if sid in connected_slaves]
+                    if not current_valid_slaves:
+                        await asyncio.sleep(3); continue
+
+                    # 2. Preview del favorito (forzar check)
+                    fav_id = next((sid for sid, s in connected_slaves.items() if getattr(s, 'is_favorite', False)), None)
+                    if fav_id:
+                        old_ts = _last_preview_timestamp.get(fav_id, 0)
+                        await manager.send_to_slave(fav_id, {"type": "guardControl", "action": "check"})
+                        for _ in range(20):
+                            await asyncio.sleep(0.25)
+                            if _last_preview_timestamp.get(fav_id, 0) > old_ts:
+                                break
+                    fav = connected_slaves.get(fav_id) if fav_id else None
+                    preview = (fav.telemetry.get('preview_data') if fav and isinstance(fav.telemetry, dict) else None) or {}
+                    changes = await filter_changes(preview)
+                    if not isinstance(changes, list):
+                        changes = []
+                    else:
+                        bad = [c for c in changes if not isinstance(c, dict)]
+                        if bad:
+                            logger.warning(f"[orchestrate_loop] Ignorando {len(bad)} cambios no dict (tipos={ {type(b).__name__ for b in bad} })")
+                            changes = [c for c in changes if isinstance(c, dict)]
+
+                    # 3. Cargas
+                    charges: Dict[str, int] = {}
+                    total_remaining = 0
+                    for sid in current_valid_slaves:
+                        try:
+                            rem = int((connected_slaves[sid].telemetry or {}).get('remaining_charges') or 0)
+                        except Exception:
+                            rem = 0
+                        charges[sid] = rem; total_remaining += rem
+
+                    if not changes:
+                        await asyncio.sleep(5); continue
+                    if total_remaining <= 0:
+                        await asyncio.sleep(30); continue
+
+                    # 4. Planificación
+                    pixels_per_batch = int(guard_config.get('pixelsPerBatch') or 10)
+                    spend_all = bool(guard_config.get('spendAllPixelsOnStart'))
+                    round_total = sum(charges.values()) if spend_all else min(sum(charges.values()), pixels_per_batch)
+                    if round_total <= 0:
+                        await asyncio.sleep(5); continue
+
+                    plan: Dict[str, int] = { sid: 0 for sid in current_valid_slaves }
+                    order = [sid for sid in current_valid_slaves if charges.get(sid, 0) > 0]
+                    idx = 0; assigned = 0
+                    while assigned < round_total and order:
+                        sid = order[idx % len(order)]
+                        if plan[sid] < charges[sid]:
+                            plan[sid] += 1; assigned += 1
+                        idx += 1
+                        if all(plan[s] >= charges[s] for s in order) and assigned < round_total:
                             break
-                fav = connected_slaves.get(fav_id) if fav_id else None
-                preview = (fav.telemetry.get('preview_data') if fav and isinstance(fav.telemetry, dict) else None) or {}
-                changes = await filter_changes(preview)
 
-                # Charges por bot (usar sólo los conectados actuales)
-                charges: Dict[str, int] = {}
-                total_remaining = 0
-                for sid in current_valid_slaves:
-                    rem = 0
                     try:
-                        rem = int((connected_slaves[sid].telemetry or {}).get('remaining_charges') or 0)
+                        changes = [ch for ch in changes if not is_locked_change(ch)]
                     except Exception:
-                        rem = 0
-                    charges[sid] = rem
-                    total_remaining += rem
+                        pass
+                    pick = min(len(changes), sum(plan.values()))
+                    if pick <= 0:
+                        await asyncio.sleep(5); continue
 
-                # Si no hay cambios, esperar indefinidamente hasta que aparezcan (modo standby)
-                if not changes:
-                    await asyncio.sleep(5)
+                    try:
+                        selected = select_pixels_by_pattern(str(guard_config.get('protectionPattern', 'random')), changes, pick)
+                    except Exception:
+                        selected = changes[:pick]
+
+                    # 5. Agrupar y construir colas
+                    TILE = 1000
+                    queues: Dict[str, List[Dict[str, Any]]] = { sid: [] for sid in current_valid_slaves }
+                    rr_list = []
+                    for sid in [s for s in current_valid_slaves if plan.get(s, 0) > 0]:
+                        rr_list += [sid] * plan[sid]
+                    for i, ch in enumerate(selected):
+                        if not isinstance(ch, dict):
+                            continue
+                        sid = rr_list[i]
+                        queues[sid].append(ch)
+
+                    req_id = uuid.uuid4().hex
+                    batch_tracker.create(req_id)
+
+                    async def send_sub(slave_id: str, items: List[dict]):
+                        subtile: Dict[tuple, List[dict]] = defaultdict(list)
+                        for ch in items:
+                            if not isinstance(ch, dict):
+                                continue
+                            try:
+                                x = int(ch.get('x')); y = int(ch.get('y'))
+                            except Exception:
+                                continue
+                            subtile[(x // TILE, y // TILE)].append(ch)
+                        SUB = 40
+                        for (tx, ty), lst in subtile.items():
+                            for i in range(0, len(lst), SUB):
+                                part = lst[i:i+SUB]
+                                coords = [{ 'x': it['x'], 'y': it['y'] } for it in part]
+                                colors = [int(it.get('expectedColor', it.get('color', 0))) for it in part]
+                                payload = { 'tileX': tx, 'tileY': ty, 'coords': coords, 'colors': colors, 'requestId': req_id }
+                                batch_tracker.assign(req_id, slave_id, payload, 0)
+                                await manager.send_to_slave(slave_id, { 'type': 'paintBatch', **payload })
+
+                    for sid, items in queues.items():
+                        if items:
+                            await send_sub(sid, items)
+
+                    deadline = asyncio.get_event_loop().time() + 90.0
+                    while asyncio.get_event_loop().time() < deadline:
+                        await asyncio.sleep(0.3)
+                        if batch_tracker.get_pending(req_id) == 0:
+                            break
+                        fails = batch_tracker.failed_assignments(req_id)
+                        for (sid, key), data in fails:
+                            candidates = [x for x in current_valid_slaves if x != sid and charges.get(x, 0) > 0] or [x for x in current_valid_slaves if x != sid]
+                            if not candidates:
+                                candidates = current_valid_slaves
+                            idx = (idx + 1) if isinstance(idx, int) else 0
+                            new_sid = candidates[idx % len(candidates)]
+                            attempts = batch_tracker.inc_attempts(req_id, sid, key)
+                            if attempts <= 3:
+                                await manager.send_to_slave(new_sid, {
+                                    'type': 'paintBatch',
+                                    'tileX': data['tileX'],
+                                    'tileY': data['tileY'],
+                                    'coords': data['coords'],
+                                    'colors': data['colors'],
+                                    'requestId': req_id
+                                })
+
+                    await asyncio.sleep(1)
+                except Exception as loop_iteration_err:
+                    logger.error(f"orchestrate_loop iteration error: {loop_iteration_err}")
+                    await asyncio.sleep(2)
                     continue
-                if total_remaining <= 0:
-                    # Esperar regeneración (30s)
-                    await asyncio.sleep(30)
-                    continue
-
-                # 3) Planificación del lote por ronda
-                pixels_per_batch = int(guard_config.get('pixelsPerBatch') or 10)
-                spend_all = bool(guard_config.get('spendAllPixelsOnStart'))
-                # Objetivo total de esta ronda
-                round_total = sum(charges.values()) if spend_all else min(sum(charges.values()), pixels_per_batch)
-                if round_total <= 0:
-                    await asyncio.sleep(5)
-                    continue
-
-                # Asignación por bot: no superar sus cargas
-                plan: Dict[str, int] = { sid: 0 for sid in current_valid_slaves }
-                # greedy round-robin
-                order = [sid for sid in current_valid_slaves if charges.get(sid, 0) > 0]
-                idx = 0
-                assigned = 0
-                while assigned < round_total and order:
-                    sid = order[idx % len(order)]
-                    if plan[sid] < charges[sid]:
-                        plan[sid] += 1
-                        assigned += 1
-                    idx += 1
-                    # salir si ya todos alcanzaron su tope de cargas
-                    if all(plan[s] >= charges[s] for s in order) and assigned < round_total:
-                        break
-
-                # Seleccionar los primeros N cambios a pintar (en orden)
-                # Primero, evitar repintar píxeles marcados como reparados recientemente
-                try:
-                    changes = [ch for ch in changes if not is_locked_change(ch)]
-                except Exception:
-                    pass
-                pick = min(len(changes), sum(plan.values()))
-                if pick <= 0:
-                    await asyncio.sleep(5)
-                    continue
-                # Aplicar patrón de protección para ordenar/seleccionar
-                try:
-                    selected = select_pixels_by_pattern(str(guard_config.get('protectionPattern', 'random')), changes, pick)
-                except Exception:
-                    selected = changes[:pick]
-
-                # Agrupar por tile y repartir por bot según su cupo (manteniendo orden)
-                TILE = 1000
-                by_tile = defaultdict(list)
-                for ch in selected:
-                    x = int(ch.get('x')); y = int(ch.get('y'))
-                    tx = x // TILE; ty = y // TILE
-                    by_tile[(tx, ty)].append(ch)
-
-                # Construir colas por slave: asignamos round-robin por plan
-                queues: Dict[str, List[Dict[str, Any]]] = { sid: [] for sid in current_valid_slaves }
-                sid_order = [sid for sid in current_valid_slaves if plan.get(sid, 0) > 0]
-                cursor_by_sid = { sid: 0 for sid in sid_order }
-                # lista lineal de selected para asignación RR respetando plan
-                rr_list = []
-                for sid in sid_order:
-                    rr_list += [sid] * plan[sid]
-                # rr_list es del tamaño de pick; asignamos en ese orden
-                for i, ch in enumerate(selected):
-                    sid = rr_list[i]
-                    queues[sid].append(ch)
-
-                # Envío por sublotes respetando tile y BatchTracker
-                req_id = uuid.uuid4().hex
-                batch_tracker.create(req_id)
-
-                async def send_sub(slave_id: str, items: List[dict]):
-                    # reagrupa por tile y trocea a SUB
-                    subtile: Dict[tuple, List[dict]] = defaultdict(list)
-                    for ch in items:
-                        x = int(ch.get('x')); y = int(ch.get('y'))
-                        subtile[(x // TILE, y // TILE)].append(ch)
-                    SUB = 40
-                    for (tx, ty), lst in subtile.items():
-                        for i in range(0, len(lst), SUB):
-                            part = lst[i:i+SUB]
-                            coords = [{ 'x': it['x'], 'y': it['y'] } for it in part]
-                            colors = [int(it.get('expectedColor', it.get('color', 0))) for it in part]
-                            payload = { 'tileX': tx, 'tileY': ty, 'coords': coords, 'colors': colors, 'requestId': req_id }
-                            batch_tracker.assign(req_id, slave_id, payload, 0)
-                            await manager.send_to_slave(slave_id, { 'type': 'paintBatch', **payload })
-
-                # enviar colas
-                for sid, items in queues.items():
-                    if items:
-                        await send_sub(sid, items)
-
-                # Esperar resultados y reintentar/reasignar
-                deadline = asyncio.get_event_loop().time() + 90.0
-                while asyncio.get_event_loop().time() < deadline:
-                    await asyncio.sleep(0.3)
-                    if batch_tracker.get_pending(req_id) == 0:
-                        break
-                    fails = batch_tracker.failed_assignments(req_id)
-                    for (sid, key), data in fails:
-                        # elegir otro slave con cargas restantes en ese momento
-                        candidates = [x for x in valid_slaves if x != sid and charges.get(x, 0) > 0] or [x for x in valid_slaves if x != sid]
-                        if not candidates:
-                            candidates = valid_slaves
-                        new_sid = candidates[(idx := (idx + 1)) % len(candidates)]
-                        attempts = batch_tracker.inc_attempts(req_id, sid, key)
-                        if attempts <= 3:
-                            await manager.send_to_slave(new_sid, {
-                                'type': 'paintBatch',
-                                'tileX': data['tileX'],
-                                'tileY': data['tileY'],
-                                'coords': data['coords'],
-                                'colors': data['colors'],
-                                'requestId': req_id
-                            })
-                # Pequeño respiro antes de siguiente ronda
-                await asyncio.sleep(1)
         except Exception as e:
             logger.error(f"orchestrate_loop error: {e}")
 
@@ -1574,14 +1597,14 @@ async def websocket_slave_endpoint(websocket: WebSocket):
     
     try:
         # Send connection confirmation
-        await websocket.send_text(json.dumps({
+        await websocket.send_text(_compress_if_needed({
             "type": "connected",
             "slave_id": slave_id
         }))
         
         # Notificar al slave si es favorito
         if connected_slaves[slave_id].is_favorite:
-            await websocket.send_text(json.dumps({
+            await websocket.send_text(_compress_if_needed({
                 "type": "favorite_status",
                 "is_favorite": True
             }))
@@ -1589,6 +1612,8 @@ async def websocket_slave_endpoint(websocket: WebSocket):
         while True:
             data = await websocket.receive_text()
             message = json.loads(data)
+            # Intentar descomprimir si es wrapper
+            message = _try_decompress(message)
             
             # Update slave info
             if slave_id in connected_slaves:
@@ -1663,49 +1688,7 @@ async def websocket_slave_endpoint(websocket: WebSocket):
                             "slave_id": slave_id,
                             "data": preview_payload
                         })
-                        # Auto-distribute si configurado
-                        if guard_config.get("autoDistribute"):
-                            now_ts = datetime.utcnow().timestamp()
-                            last_ts = getattr(manager, '_last_auto_distribute', 0)
-                            if (now_ts - last_ts) > 15:  # throttle 15s
-                                setattr(manager, '_last_auto_distribute', now_ts)
-                                try:
-                                    changes = preview_payload.get('changes', [])
-                                    # Filtrar los píxeles recientemente reparados (evitar duplicados)
-                                    if isinstance(changes, list) and changes:
-                                        changes = [c for c in changes if not is_locked_change(c)]
-                                    if changes:
-                                        # Filtrar a estructura pixels para distribución
-                                        pixels = []
-                                        for ch in changes[:2000]:  # limitar por seguridad
-                                            # Tratar 'incorrect' como alta prioridad igual que 'missing'
-                                            t = ch.get('type')
-                                            high = (t in ('missing', 'incorrect'))
-                                            pixels.append({ 'x': ch.get('x'), 'y': ch.get('y'), 'color': ch.get('expectedColor', 0), 'priority': 'high' if high else 'medium' })
-                                        # Reutilizar lógica de create_repair_orders (manual) distribuyendo internamente
-                                        available_slaves = [ (sid, s) for sid, s in connected_slaves.items() if s.status in ['idle', 'working'] ]
-                                        if available_slaves:
-                                            # Distribuir simple round-robin
-                                            idx = 0
-                                            for p in pixels:
-                                                sid, _sinfo = available_slaves[idx % len(available_slaves)]
-                                                await manager.send_to_slave(sid, {
-                                                    'type': 'repairOrder',
-                                                    'coords': [ {'x': p['x'], 'y': p['y']} ],
-                                                    'colors': [ p['color'] ],
-                                                    'source': 'auto_distribute',
-                                                    'total_repairs': 1
-                                                })
-                                                idx += 1
-                                            await manager.broadcast_to_ui({
-                                                'type': 'auto_distribute_result',
-                                                'distributed': len(pixels),
-                                                'slaves_used': len(available_slaves)
-                                            })
-                                        else:
-                                            await manager.broadcast_to_ui({ 'type': 'auto_distribute_skipped', 'reason': 'no_slaves' })
-                                except Exception as _e:
-                                    logger.error(f"Auto distribute error: {_e}")
+                        # autoDistribute eliminado
                 elif message.get("type") == "repair_suggestion":
                     # Guard favorite envía sugerencia de reparación
                     await manager.broadcast_to_ui({
