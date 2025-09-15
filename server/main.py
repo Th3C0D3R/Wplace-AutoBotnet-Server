@@ -1050,23 +1050,50 @@ async def set_favorite_slave(slave_id: str):
     """Mark a single slave as favorite (only one at a time)."""
     if slave_id not in connected_slaves:
         raise HTTPException(status_code=404, detail="Slave not found")
-    
-    # Unset previous favorite and notify
-    for sid, s in connected_slaves.items():
-        if getattr(s, 'is_favorite', False):
-            s.is_favorite = False
-            await manager.send_to_slave(sid, {
-                "type": "setFavorite",
-                "isFavorite": False
+
+    # Si ya es el favorito actual, reenviar (opcional) config y devolver rápido
+    already_fav = bool(getattr(connected_slaves[slave_id], 'is_favorite', False))
+    if already_fav:
+        # Refresco opcional de guardConfig / guardData si el cliente quiere forzar sincronía
+        try:
+            await manager.send_to_slave(slave_id, {
+                "type": "guardConfig",
+                "config": guard_config,
+                "timestamp": datetime.utcnow().isoformat()
             })
-    
-    # Set new favorite and notify
+            if last_guard_upload:
+                await manager.send_to_slave(slave_id, {
+                    "type": "guardData",
+                    "filename": last_guard_upload.get("filename", "uploaded_guard.json"),
+                    "guardData": last_guard_upload.get("data", {}),
+                    "timestamp": datetime.utcnow().isoformat()
+                })
+        except Exception as _e:
+            logger.error(f"Error re-sending data to existing favorite {slave_id}: {_e}")
+        return {"ok": True, "favorite": slave_id, "unchanged": True}
+
+    # Snapshot de favoritos previos (normalmente 0 o 1) para evitar RuntimeError si una
+    # desconexión ocurre mientras enviamos mensajes (manager.send_to_slave puede mutar el dict)
+    previous_favorites = [sid for sid, s in list(connected_slaves.items()) if getattr(s, 'is_favorite', False) and sid != slave_id]
+
+    # Desmarcar antiguos favoritos de forma segura
+    for prev_id in previous_favorites:
+        if prev_id in connected_slaves:
+            try:
+                connected_slaves[prev_id].is_favorite = False
+                await manager.send_to_slave(prev_id, {"type": "setFavorite", "isFavorite": False})
+            except Exception as _e:
+                # Si falla el envío (timeout / ping) ignoramos; manager ya gestiona desconexión
+                logger.warning(f"Failed notifying old favorite {prev_id}: {_e}")
+
+    # Establecer nuevo favorito
     connected_slaves[slave_id].is_favorite = True
-    await manager.send_to_slave(slave_id, {
-        "type": "setFavorite",
-        "isFavorite": True
-    })
-    # Push current guard config to new favorite
+    try:
+        await manager.send_to_slave(slave_id, {"type": "setFavorite", "isFavorite": True})
+    except Exception as _e:
+        logger.error(f"Error notifying new favorite flag to {slave_id}: {_e}")
+
+    # Enviar configuración Guard y posible guardData persistido
     try:
         await manager.send_to_slave(slave_id, {
             "type": "guardConfig",
@@ -1075,7 +1102,6 @@ async def set_favorite_slave(slave_id: str):
         })
     except Exception as _e:
         logger.error(f"Error sending guard config to new favorite {slave_id}: {_e}")
-    # Enviar último guardData si existe para reactivar preview
     try:
         if last_guard_upload:
             await manager.send_to_slave(slave_id, {
@@ -1086,13 +1112,10 @@ async def set_favorite_slave(slave_id: str):
             })
     except Exception as _e:
         logger.error(f"Error sending guardData to new favorite {slave_id}: {_e}")
-    
-    # Notify UI
-    await manager.broadcast_to_ui({
-        "type": "slave_favorite",
-        "slave_id": slave_id
-    })
-    return {"ok": True, "favorite": slave_id}
+
+    # Notificar UIs
+    await manager.broadcast_to_ui({"type": "slave_favorite", "slave_id": slave_id})
+    return {"ok": True, "favorite": slave_id, "demoted": previous_favorites}
 
 @app.get("/api/projects")
 async def get_projects():
