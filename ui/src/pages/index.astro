@@ -512,7 +512,13 @@ import PreviewPanel from "../components/PreviewPanel.astro";
             case 'ui_selected_slaves':
               if (Array.isArray(message.slave_ids)) {
                 this._selectedSlavesServer = new Set(message.slave_ids);
-                this.displaySlaves();
+                if (this.slaves.size > 0) {
+                  // Si ya tenemos slaves renderizados, aplicamos directamente
+                  this.applyServerSelection();
+                } else {
+                  // Si aún no están, se aplicará tras el primer displaySlaves()
+                  this.displaySlaves();
+                }
               }
               break;
             case 'telemetry_update':
@@ -815,6 +821,10 @@ import PreviewPanel from "../components/PreviewPanel.astro";
           this.recomputeRoundPlan();
           // Actualizar estado de panel de config
           try { this.updateConfigPanelEnabledState(); } catch {}
+          // Aplicar selección del servidor si existe
+          if (this._selectedSlavesServer && this._selectedSlavesServer.size > 0) {
+            this.applyServerSelection();
+          }
         }
 
         async setFavoriteSlave(slaveId) {
@@ -892,6 +902,26 @@ import PreviewPanel from "../components/PreviewPanel.astro";
             this.slaves.get(slaveId).status = status;
             this.displaySlaves();
           }
+        }
+
+        applyServerSelection() {
+          if (!this._selectedSlavesServer || !(this._selectedSlavesServer instanceof Set)) return;
+          const checkboxes = document.querySelectorAll<HTMLInputElement>('.slave-toggle');
+          checkboxes.forEach(cb => {
+            const should = this._selectedSlavesServer.has(cb.value);
+            cb.checked = should;
+            this.updateToggleState(cb.id, should);
+          });
+          // Actualizar master toggle
+          const all = Array.from(checkboxes);
+          const master = document.getElementById('toggle-all-slaves') as HTMLInputElement | null;
+          if (master) {
+            const allOn = all.length > 0 && all.every(c => c.checked);
+            master.checked = allOn;
+            this.updateToggleState('toggle-all-slaves', allOn);
+          }
+          this.updateControlButtons();
+          this.recomputeRoundPlan();
         }
 
         setupEventListeners() {
