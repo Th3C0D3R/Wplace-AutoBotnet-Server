@@ -5,7 +5,7 @@ que se envían a través de WebSocket, optimizando el ancho de banda para mensaj
 manteniendo la latencia baja para mensajes críticos.
 
 Funcionalidades:
-- Compresión automática de mensajes grandes (>20MB)
+- Compresión automática de mensajes grandes (>5MB)
 - Exclusión de tipos críticos de latencia (paintBatch, repairOrder)
 - Descompresión transparente de mensajes comprimidos
 - Manejo robusto de errores
