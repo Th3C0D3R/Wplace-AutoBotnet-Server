@@ -1,3 +1,11 @@
+# ⚠️ Versión Beta – Puede contener errores
+
+> **IMPORTANTE**: Este proyecto está actualmente en **fase beta**.  
+> Algunas funciones pueden no estar completamente implementadas o presentar errores.  
+> Se recomienda usarlo con precaución y reportar cualquier problema encontrado.
+
+---
+
 # WPlace Master Server
 
 <p align="center">
