@@ -35,7 +35,8 @@ OK="\033[1;32m[ OK ]\033[0m"
 cd "$(dirname "$0")"
 
 # Preguntas interactivas
-read -r -p "IP o dominio del servidor (ej. 192.168.1.100): " SERVER_IP
+read -r -p "IP o dominio del servidor (ej. 192.168.1.19): " SERVER_IP
+SERVER_IP=${SERVER_IP:-"192.168.1.19"}
 read -r -p "Usuario SSH [root]: " SSH_USER
 SSH_USER=${SSH_USER:-"root"}
 read -r -s -p "Contraseña SSH (se usará si hay sshpass, sino pedirá interacción): " SSH_PASS

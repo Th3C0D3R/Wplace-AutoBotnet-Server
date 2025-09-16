@@ -1125,9 +1125,26 @@ import PreviewPanel from "../components/PreviewPanel.astro";
           } catch(e){
             this.log(`⚠️ Error calling /api/projects/clear-all: ${e?.message || e}`);
           }
+          
+          // NUEVO: Detener análisis Guard en todos los slaves para evitar preview persistente
+          try {
+            await fetch(`${this.apiBase()}/api/guard/clear`, { method: 'POST' });
+            this.log('🛡️ Guard state cleared en slaves');
+          } catch(e){
+            this.log(`⚠️ Error clearing guard state: ${e?.message || e}`);
+          }
+          
           // Reset inmediato local
           try {
             const statusEl = document.getElementById('file-status'); if (statusEl) statusEl.textContent = 'No file selected';
+            
+            // NUEVO: Limpiar el input de archivo para permitir recargar el mismo archivo
+            const fileInput = document.getElementById('project-file') as HTMLInputElement | null; 
+            if (fileInput) fileInput.value = '';
+            
+            const detectedEl = document.getElementById('detected-mode'); 
+            if (detectedEl) detectedEl.textContent = 'No file loaded - mode will be auto-detected';
+            
             this.activeProject = null; this.projectConfig = null; this.detectedBotMode = null;
             this.lastPreviewData = null; this.previewChanges = []; this.previewMeta = {};
             this.guardPreview = { analysis:null, togglesInitialized:false, show:{correct:true, incorrect:true, missing:true}, area:null };

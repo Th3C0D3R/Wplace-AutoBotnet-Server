@@ -280,30 +280,29 @@ def setup_endpoints(app):
     
     @app.post("/api/guard/clear")
     async def guard_clear_state():
-        """Limpiar estado Guard en slave favorito y servidor."""
-        fav_id = next((sid for sid, s in connected_slaves.items() if getattr(s, 'is_favorite', False)), None)
-        target_id = fav_id
+        """Limpiar estado Guard en TODOS los slaves conectados y servidor."""
+        # CAMBIO: Enviar comando clear a TODOS los slaves conectados, no solo al favorito
+        cleared_slaves = []
         
-        if not target_id:
-            if connected_slaves:
-                target_id = next(iter(connected_slaves.keys()))
-                logger.warning(f"[GUARD CLEAR] No favorite slave; usando fallback {target_id}")
-            else:
-                target_id = None
+        if connected_slaves:
+            # Enviar comando de limpieza a todos los slaves
+            for slave_id in list(connected_slaves.keys()):
+                try:
+                    await manager.send_to_slave(slave_id, {"type": "guardControl", "action": "clear"})
+                    cleared_slaves.append(slave_id)
+                    logger.info(f"[GUARD CLEAR] Sent clear command to {slave_id}")
+                except Exception as e:
+                    logger.error(f"[GUARD CLEAR] Failed to send clear to {slave_id}: {e}")
         
-        # Orden de limpieza al slave
-        if target_id:
-            await manager.send_to_slave(target_id, {"type": "guardControl", "action": "clear"})
-        
-        # Limpiar telemetría en servidor
+        # Limpiar telemetría en servidor para todos los slaves
         try:
-            sinfo = connected_slaves.get(target_id) if target_id else None
-            if sinfo and isinstance(sinfo.telemetry, dict):
-                sinfo.telemetry.pop('preview_data', None)
-                for k in ['correctPixels', 'incorrectPixels', 'missingPixels']:
-                    sinfo.telemetry.pop(k, None)
+            for slave_id, sinfo in connected_slaves.items():
+                if isinstance(sinfo.telemetry, dict):
+                    sinfo.telemetry.pop('preview_data', None)
+                    for k in ['correctPixels', 'incorrectPixels', 'missingPixels']:
+                        sinfo.telemetry.pop(k, None)
         except Exception as e:
-            logger.error(f"Error clearing telemetry for {target_id}: {e}")
+            logger.error(f"Error clearing telemetry: {e}")
         
         # Limpiar último guardData
         global last_guard_upload
@@ -312,14 +311,11 @@ def setup_endpoints(app):
         # Notificar UIs
         await manager.broadcast_to_ui({
             "type": "guard_cleared",
-            "slave_id": target_id,
+            "cleared_slaves": cleared_slaves,
             "guardDataCleared": True
         })
         
-        resp = {"ok": True, "cleared": target_id}
-        if not target_id:
-            resp["skipped"] = "no_slave_connected"
-        return resp
+        return {"ok": True, "cleared_slaves": cleared_slaves, "total_cleared": len(cleared_slaves)}
     
     @app.get("/api/guard/preview")
     async def guard_get_preview():
