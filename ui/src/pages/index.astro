@@ -155,6 +155,8 @@ import PreviewPanel from "../components/PreviewPanel.astro";
           this.projectConfig = null;
           this.guardConfig = {};
           this.autoDistribute = false;
+          // Estrategia de distribución de cargas (frontend mirror del backend)
+          this.guardConfig.chargeStrategy = this.guardConfig.chargeStrategy || 'greedy';
           this.lastPreviewData = null; // init
           this.guardPreview = { analysis:null, togglesInitialized:false, show:{correct:true, incorrect:true, missing:true}, area:null };
           this.previewChanges = [];
@@ -1403,6 +1405,46 @@ import PreviewPanel from "../components/PreviewPanel.astro";
             
             const analysis = { correct, incorrect, missing, originalPixels };
             
+            // Construir lista de cambios para recomputeRoundPlan
+            const changes = [];
+            // Agregar píxeles incorrectos como cambios tipo 'incorrect'
+            if (Array.isArray(data.incorrectPixelsList)) {
+              data.incorrectPixelsList.forEach(p => {
+                if (p && typeof p.x !== 'undefined' && typeof p.y !== 'undefined') {
+                  changes.push({
+                    type: 'incorrect',
+                    x: p.x,
+                    y: p.y,
+                    expectedColor: p.originalR !== undefined ? 
+                      ((p.originalR & 0xFF) << 16) | ((p.originalG & 0xFF) << 8) | (p.originalB & 0xFF) : 
+                      (p.color || 0),
+                    color: p.r !== undefined ? 
+                      ((p.r & 0xFF) << 16) | ((p.g & 0xFF) << 8) | (p.b & 0xFF) : 
+                      (p.currentColor || 0)
+                  });
+                }
+              });
+            }
+            // Agregar píxeles faltantes como cambios tipo 'missing'
+            if (Array.isArray(data.missingPixelsList)) {
+              data.missingPixelsList.forEach(p => {
+                if (p && typeof p.x !== 'undefined' && typeof p.y !== 'undefined') {
+                  changes.push({
+                    type: 'missing',
+                    x: p.x,
+                    y: p.y,
+                    expectedColor: p.r !== undefined ? 
+                      ((p.r & 0xFF) << 16) | ((p.g & 0xFF) << 8) | (p.b & 0xFF) : 
+                      (p.color || 0)
+                  });
+                }
+              });
+            }
+            
+            // Almacenar datos con la lista de cambios construida
+            this.lastPreviewData = { ...data, changes };
+            this.log(`📝 Built changes list: ${changes.length} total (incorrect: ${data.incorrectPixelsList?.length || 0}, missing: ${data.missingPixelsList?.length || 0})`);
+            
             // Almacenar y renderizar
             this.guardPreview.analysis = analysis; 
             this.guardPreview.area = area; 
@@ -1632,7 +1674,7 @@ import PreviewPanel from "../components/PreviewPanel.astro";
           const selectedSlaves = Array.from(document.querySelectorAll<HTMLInputElement>('.slave-toggle:checked')).map(cb => cb.value);
           try { localStorage.setItem('selectedSlaves', JSON.stringify(selectedSlaves)); } catch {}
           try { await fetch(`${this.apiBase()}/api/ui/selected-slaves`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slave_ids: selectedSlaves }) }); } catch {}
-          const strategy = (document.getElementById('charge-strategy') as HTMLSelectElement | null)?.value;
+          const strategy = (document.getElementById('gc-chargeStrategy') as HTMLSelectElement | null)?.value || this.guardConfig?.chargeStrategy || 'greedy';
 
           if (!selectedSlaves.length || !this.detectedBotMode) {
             this.log('Please select slaves and load a project file');
@@ -1732,7 +1774,7 @@ import PreviewPanel from "../components/PreviewPanel.astro";
               let projectConfig = { mode: this.detectedBotMode, config: this.projectConfig || {} };
               const projectResponse = await fetch(`${this.apiBase()}/api/projects`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: `Session ${Date.now()}`, ...projectConfig }) });
               const projectData = await projectResponse.json();
-              const sessionResponse = await fetch(`${this.apiBase()}/api/sessions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project_id: projectData.project_id, slave_ids: selectedSlaves, strategy: (document.getElementById('charge-strategy') as HTMLSelectElement | null)?.value || 'balanced' }) });
+              const sessionResponse = await fetch(`${this.apiBase()}/api/sessions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project_id: projectData.project_id, slave_ids: selectedSlaves, strategy: (document.getElementById('gc-chargeStrategy') as HTMLSelectElement | null)?.value || this.guardConfig?.chargeStrategy || 'greedy' }) });
               const sessionData = await sessionResponse.json();
               this.currentSession = sessionData.session_id;
             }
@@ -1793,6 +1835,7 @@ import PreviewPanel from "../components/PreviewPanel.astro";
               // removed watchMode & autoDistribute
               ['gc-minChargesToWait','minChargesToWait'],
               ['gc-pixelsPerBatch','pixelsPerBatch'],
+              ['gc-chargeStrategy','chargeStrategy'],
               ['gc-recentLockSeconds','recentLockSeconds'],
               ['gc-randomWaitMin','randomWaitMin'],
               ['gc-randomWaitMax','randomWaitMax'],
@@ -1823,6 +1866,7 @@ import PreviewPanel from "../components/PreviewPanel.astro";
               // removed watchMode & autoDistribute
               ['gc-minChargesToWait','minChargesToWait','value','int'],
               ['gc-pixelsPerBatch','pixelsPerBatch','value','int'],
+              ['gc-chargeStrategy','chargeStrategy','value'],
               ['gc-recentLockSeconds','recentLockSeconds','value','int'],
               ['gc-randomWaitMin','randomWaitMin','value','float'],
               ['gc-randomWaitMax','randomWaitMax','value','float'],
@@ -1891,6 +1935,9 @@ import PreviewPanel from "../components/PreviewPanel.astro";
             panelRoot.querySelectorAll('input, select').forEach((el:any) => {
               el.addEventListener('change', () => this.scheduleConfigAutosave());
               el.addEventListener('blur', () => this.scheduleConfigAutosave());
+              if (el.id === 'gc-chargeStrategy') {
+                el.addEventListener('change', () => { try { this.recomputeRoundPlan(); } catch {} });
+              }
             });
           }
 
@@ -1980,6 +2027,7 @@ import PreviewPanel from "../components/PreviewPanel.astro";
             // removed watchMode & autoDistribute
             ['gc-minChargesToWait','minChargesToWait','value','int'],
             ['gc-pixelsPerBatch','pixelsPerBatch','value','int'],
+            ['gc-chargeStrategy','chargeStrategy','value'],
             ['gc-recentLockSeconds','recentLockSeconds','value','int'],
             ['gc-randomWaitMin','randomWaitMin','value','float'],
             ['gc-randomWaitMax','randomWaitMax','value','float'],
@@ -2005,7 +2053,7 @@ import PreviewPanel from "../components/PreviewPanel.astro";
 
         async resetInlineGuardConfig(){
           if (!confirm('Reset to defaults?')) return;
-          const defaults={protectionPattern:'random',preferColor:false,excludeColor:false,minChargesToWait:20,pixelsPerBatch:10,spendAllPixelsOnStart:false,randomWaitTime:false,randomWaitMin:5,randomWaitMax:15,colorThreshold:10,watchMode:true,autoDistribute:false,preferredColorIds:[],excludedColorIds:[]};
+          const defaults={protectionPattern:'random',preferColor:false,excludeColor:false,minChargesToWait:20,pixelsPerBatch:10,chargeStrategy:'greedy',spendAllPixelsOnStart:false,randomWaitTime:false,randomWaitMin:5,randomWaitMax:15,colorThreshold:10,watchMode:true,autoDistribute:false,preferredColorIds:[],excludedColorIds:[]};
           const st = document.getElementById('gc-status'); if (st) st.textContent = 'Resetting...';
           try{
             const r = await fetch(`${this.apiBase()}/api/guard/config`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(defaults)});
@@ -2119,24 +2167,71 @@ import PreviewPanel from "../components/PreviewPanel.astro";
             }
             const charges:any = {}; let total = 0;
             selectedIds.forEach(sid => { const rc = Number(this.slaves.get(sid)?.telemetry?.remaining_charges || 0) || 0; charges[sid] = rc; total += rc; });
+            this.log(`💳 Charges: total=${total}, details=${JSON.stringify(charges)}`);
             const pixelsPerBatch = Number((this.guardConfig?.pixelsPerBatch) ?? 10) || 10;
             const spendAll = !!this.guardConfig?.spendAllPixelsOnStart;
+            const strategySelect = (document.getElementById('gc-chargeStrategy') as HTMLSelectElement | null);
+            const strategy = (strategySelect?.value || this.guardConfig?.chargeStrategy || 'greedy').toLowerCase();
             let roundTotal = spendAll ? total : Math.min(total, pixelsPerBatch);
             if (roundTotal <= 0) {
               selectedIds.forEach(sid => this.updateSlaveCardQuota(sid, 0, 0));
               this.currentRoundPlan = {};
               return;
             }
-            const plan:any = {}; selectedIds.forEach(sid => plan[sid] = 0);
-            const order = selectedIds.filter(sid => (charges[sid] || 0) > 0);
-            let i = 0, assigned = 0;
-            while (assigned < roundTotal && order.length) {
-              const sid = order[i % order.length];
-              if (plan[sid] < charges[sid]) { plan[sid] += 1; assigned += 1; }
-              i++;
-              if (assigned < roundTotal && order.every(s => plan[s] >= charges[s])) break;
+            // --- compute_distribution (mirror) ---
+            const valid: Record<string, number> = {}; selectedIds.forEach(sid => { if (charges[sid] > 0) valid[sid] = Number(charges[sid]) || 0; });
+            const capTotal: number = Object.values(valid).reduce((a, b) => a + (Number(b) || 0), 0);
+            const target: number = Math.min(Number(roundTotal)||0, Number(capTotal)||0);
+            let plan:any = {}; selectedIds.forEach(sid => plan[sid] = 0);
+            if (target > 0 && capTotal > 0) {
+              if (strategy === 'round_robin') {
+                const order = Object.keys(valid);
+                let idx=0, assigned=0;
+                while (assigned < target && order.length){
+                  const sid = order[idx % order.length];
+                  if (plan[sid] < valid[sid]) { plan[sid]++; assigned++; }
+                  idx++;
+                  if (assigned < target && order.every(s => plan[s] >= valid[s])) break;
+                }
+              } else if (strategy === 'balanced') {
+                const totalCh = capTotal || 1; let assigned=0; const fractional:any[]=[];
+                Object.entries(valid).forEach(([sid, ch]: any)=>{
+                  const ideal = (ch/totalCh)*target; const base = Math.min(Math.floor(ideal), ch);
+                  plan[sid]=base; assigned+=base; fractional.push([sid, ideal-base]);
+                });
+                if (assigned < target){
+                  fractional.sort((a,b)=>b[1]-a[1]);
+                  for (const [sid,_r] of fractional){
+                    if (assigned>=target) break;
+                    if (plan[sid] < valid[sid]) { plan[sid]++; assigned++; }
+                  }
+                }
+                Object.keys(plan).forEach(sid=>{ if (plan[sid] > (valid[sid]||0)) plan[sid]=valid[sid]; });
+              } else { // greedy
+                const ordered = Object.entries(valid).sort((a,b)=> (Number(b[1])||0) - (Number(a[1])||0));
+                let remaining = target;
+                for (const [sid, ch] of ordered){
+                  if (remaining<=0) break; const take = Math.min(Number(ch)||0, remaining); plan[sid]=take; remaining-=take;
+                }
+              }
+              // Ajuste residual
+              const targetNum = Number(target)||0;
+              const planVals: number[] = Object.values(plan).map(v=>Number(v)||0);
+              let diff = targetNum - planVals.reduce((a:number,b:number)=>a+b,0);
+              if (diff>0){
+                const expandable = Object.keys(valid).filter(sid=>plan[sid] < valid[sid]);
+                let k=0;
+                while (diff>0 && expandable.length){
+                  const sid = expandable[k % expandable.length];
+                  if (plan[sid] < valid[sid]) { plan[sid]++; diff--; }
+                  k++;
+                  if (expandable.every(s=>plan[s] >= valid[s])) break;
+                }
+              }
             }
+            // --- end compute_distribution ---
             const changes = (this.lastPreviewData && Array.isArray(this.lastPreviewData.changes)) ? this.lastPreviewData.changes : [];
+            this.log(`🔍 Raw changes: ${changes.length}, types: ${changes.map(c=>c?.type).filter(Boolean).join(',')}`);
             const excluded = (this.guardConfig?.excludeColor && Array.isArray(this.guardConfig?.excludedColorIds)) ? new Set(this.guardConfig.excludedColorIds) : new Set();
             // Tratar incorrect igual que missing; filtrar bloqueados por TTL
             const eligible = changes.filter(c => {
@@ -2148,6 +2243,7 @@ import PreviewPanel from "../components/PreviewPanel.astro";
               if (k && this._recentRepairs.has(k) && (this._recentRepairs.get(k) || 0) > 0) return false;
               return true;
             });
+            this.log(`✅ Eligible changes: ${eligible.length} (excluded colors: ${excluded.size}, TTL blocked: ${changes.length - eligible.length - [...excluded].length})`);
             const maxAssignable = eligible.length;
             const planSum = Object.values(plan).reduce((a:any,b:any)=>a+b,0);
             let finalPlan = { ...plan } as any;
@@ -2164,6 +2260,12 @@ import PreviewPanel from "../components/PreviewPanel.astro";
             });
             this.slaves.forEach((_, sid) => { if (!selectedIds.includes(sid)) this.updateSlaveCardQuota(sid, 0, 0); });
             this.currentRoundPlan = finalPlan;
+            // Log plan
+            try {
+              const totalPlan = Object.values(finalPlan).reduce((a: number, b: any)=> a + (Number(b)||0), 0);
+              const summary = Object.entries(finalPlan).map(([k,v])=>`${k}:${v}`).join(' ');
+              this.log(`🔢 Plan(strategy=${strategy}) total=${totalPlan} ${summary}`);
+            } catch {}
           } catch(e){ this.log('⚠️ Recompute plan error: '+ (e?.message || e)); }
         }
 

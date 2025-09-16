@@ -113,6 +113,93 @@ def setup_session_endpoints(app):
             return changes
         
         # Bucle de orquestación
+        # ================== Estrategias de distribución ==================
+        def compute_distribution(strategy: str, charges: Dict[str,int], round_total: int) -> Dict[str,int]:
+            """Calcular plan de distribución de píxeles por slave según estrategia.
+
+            Garantías:
+            - Nunca asigna más que charges[sid]
+            - Suma(plan) <= min(round_total, sum(charges.values()))
+            - Ajusta residuales para alcanzar el máximo posible <= round_total
+            """
+            valid = {sid: max(0, int(c)) for sid, c in charges.items() if c > 0}
+            if not valid or round_total <= 0:
+                return {sid: 0 for sid in charges.keys()}
+            cap_total = sum(valid.values())
+            target = min(round_total, cap_total)
+            if target <= 0:
+                return {sid: 0 for sid in charges.keys()}
+
+            strategy = (strategy or 'greedy').lower()
+            plan = {sid: 0 for sid in valid.keys()}
+
+            if strategy == 'round_robin':
+                order = list(valid.keys())
+                idx = 0
+                assigned = 0
+                while assigned < target and order:
+                    sid = order[idx % len(order)]
+                    if plan[sid] < valid[sid]:
+                        plan[sid] += 1
+                        assigned += 1
+                    idx += 1
+                    # Romper si todos están llenos
+                    if assigned < target and all(plan[s] >= valid[s] for s in order):
+                        break
+            elif strategy == 'balanced':
+                # Proporcional por charges
+                total_ch = sum(valid.values()) or 1
+                fractional = []  # (sid, floor, remainder)
+                assigned = 0
+                for sid, ch in valid.items():
+                    ideal = (ch / total_ch) * target
+                    base = int(ideal)
+                    plan[sid] = min(base, ch)
+                    assigned += plan[sid]
+                    fractional.append((sid, ideal - base))
+                # Repartir residuales si falta
+                if assigned < target:
+                    fractional.sort(key=lambda x: x[1], reverse=True)
+                    for sid, _rem in fractional:
+                        if assigned >= target:
+                            break
+                        if plan[sid] < valid[sid]:
+                            plan[sid] += 1
+                            assigned += 1
+                # Clamp final (defensivo)
+                for sid in list(plan.keys()):
+                    if plan[sid] > valid[sid]:
+                        plan[sid] = valid[sid]
+            else:  # 'greedy' por defecto
+                # Ordenar por más charges → bloques grandes para minimizar mensajes
+                ordered = sorted(valid.items(), key=lambda x: x[1], reverse=True)
+                remaining = target
+                for sid, ch in ordered:
+                    if remaining <= 0:
+                        break
+                    take = min(ch, remaining)
+                    plan[sid] = take
+                    remaining -= take
+
+            # Ajuste final si por alguna razón se quedó corto y hay hueco residual
+            diff = target - sum(plan.values())
+            if diff > 0:
+                # Añadir de forma round robin sobre los que aún tienen capacidad
+                expandable = [sid for sid in valid.keys() if plan[sid] < valid[sid]]
+                i = 0
+                while diff > 0 and expandable:
+                    sid = expandable[i % len(expandable)]
+                    if plan[sid] < valid[sid]:
+                        plan[sid] += 1
+                        diff -= 1
+                    i += 1
+                    if all(plan[s] >= valid[s] for s in expandable):
+                        break
+
+            # Rellenar con cero para slaves sin charge
+            full_plan = {sid: plan.get(sid, 0) for sid in charges.keys()}
+            return full_plan
+
         async def orchestrate_loop():
             try:
                 while active_protect_loops.get(session_id, {}).get('running'):
@@ -163,27 +250,29 @@ def setup_session_endpoints(app):
                             await asyncio.sleep(30)
                             continue
                         
-                        # 4. Planificación
+                        # 4. Planificación con estrategias
                         pixels_per_batch = int(guard_config.get('pixelsPerBatch') or 10)
                         spend_all = bool(guard_config.get('spendAllPixelsOnStart'))
-                        round_total = sum(charges.values()) if spend_all else min(sum(charges.values()), pixels_per_batch)
-                        if round_total <= 0:
+                        strategy = str(guard_config.get('chargeStrategy', 'greedy')).lower()
+
+                        sum_charges = sum(charges.values())
+                        desired = sum_charges if spend_all else min(sum_charges, pixels_per_batch)
+                        if desired <= 0:
                             await asyncio.sleep(5)
                             continue
-                        
-                        plan: Dict[str, int] = {sid: 0 for sid in current_valid_slaves}
-                        order = [sid for sid in current_valid_slaves if charges.get(sid, 0) > 0]
-                        idx = 0
-                        assigned = 0
-                        
-                        while assigned < round_total and order:
-                            sid = order[idx % len(order)]
-                            if plan[sid] < charges[sid]:
-                                plan[sid] += 1
-                                assigned += 1
-                            idx += 1
-                            if all(plan[s] >= charges[s] for s in order) and assigned < round_total:
-                                break
+
+                        # Esperar si no alcanzamos el lote deseado y no es spend_all
+                        if not spend_all and sum_charges < pixels_per_batch:
+                            logger.info(f"[planner] Waiting for charges: need {pixels_per_batch} have {sum_charges}")
+                            await asyncio.sleep(10)
+                            continue
+
+                        plan = compute_distribution(strategy, {sid: charges[sid] for sid in current_valid_slaves}, desired)
+                        if not any(v > 0 for v in plan.values()):
+                            await asyncio.sleep(5)
+                            continue
+                        idx = 0  # reutilizado más adelante en reintentos
+                        logger.info("[planner] strategy=%s desired=%d plan=%s", strategy, desired, plan)
                         
                         try:
                             changes = [ch for ch in changes if not is_locked_change(ch)]
