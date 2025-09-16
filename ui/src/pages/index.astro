@@ -327,10 +327,7 @@ import PreviewPanel from "../components/PreviewPanel.astro";
         }
 
         connectWebSocket() {
-          const serverUrl = this.getServerUrl();
-          const protocol = serverUrl.startsWith('https:') ? 'wss:' : 'ws:';
-          const baseUrl = serverUrl.replace(/^https?:\/\//, '');
-          const wsUrl = `${protocol}//${baseUrl}/ws/ui`;
+          const wsUrl = this.getWebSocketUrl();
           
           this.log(`🔌 Connecting to WebSocket: ${wsUrl}`);
           this.ws = new WebSocket(wsUrl);
@@ -2152,10 +2149,48 @@ import PreviewPanel from "../components/PreviewPanel.astro";
         getServerUrl() {
           // Usar variable de entorno si está configurada, sino usar servidor local por defecto
           const configuredUrl = import.meta.env.PUBLIC_SERVER_URL;
+          console.log(`🔧 Raw SERVER_URL config: "${configuredUrl}"`);
+          
           if (configuredUrl && configuredUrl.trim()) {
-            return configuredUrl.trim();
+            const normalized = this.normalizeServerUrl(configuredUrl.trim());
+            console.log(`🔧 Normalized SERVER_URL: "${normalized}"`);
+            return normalized;
           }
-          return `${window.location.protocol}//${window.location.hostname}:8008`;
+          
+          const fallback = `${window.location.protocol}//${window.location.hostname}:8008`;
+          console.log(`🔧 Using fallback SERVER_URL: "${fallback}"`);
+          return fallback;
+        }
+
+        normalizeServerUrl(url) {
+          // Si no tiene protocolo, detectar automáticamente
+          if (!url.startsWith('http://') && !url.startsWith('https://')) {
+            // Detectar protocolo basado en el actual o usar https por defecto para dominios remotos
+            const protocol = window.location.protocol === 'https:' ? 'https://' : 'http://';
+            url = protocol + url;
+          }
+          
+          // Si no tiene puerto y es un dominio remoto detrás de nginx, asumimos puerto estándar
+          if (!url.match(/:\d+$/) && !url.includes('localhost') && !url.includes('127.0.0.1')) {
+            // Para dominios remotos sin puerto, nginx maneja la redirección automáticamente
+            return url;
+          }
+          
+          // Para localhost sin puerto específico, agregar :8008
+          if ((url.includes('localhost') || url.includes('127.0.0.1')) && !url.match(/:\d+$/)) {
+            url = url + ':8008';
+          }
+          
+          return url;
+        }
+
+        getWebSocketUrl() {
+          const serverUrl = this.getServerUrl();
+          const protocol = serverUrl.startsWith('https://') ? 'wss://' : 'ws://';
+          const cleanUrl = serverUrl.replace(/^https?:\/\//, '');
+          const wsUrl = `${protocol}${cleanUrl}/ws/ui`;
+          console.log(`🔧 WebSocket URL: "${wsUrl}"`);
+          return wsUrl;
         }
 
         // ======= NUEVOS HELPERS UI DE CUOTAS Y PROGRESO =======

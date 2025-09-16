@@ -27,13 +27,16 @@ services:
       dockerfile: Dockerfile
       args:
         # Configuración del servidor - cambiar aquí para conectar a servidor remoto
-        # Ejemplos: http://192.168.1.100:8008, https://mi-servidor.com:8008
+        # Ejemplos: 
+        #   testbotnet.alarisco.xyz           (dominio sin protocolo, se detecta automáticamente)
+        #   192.168.1.100:8008               (IP con puerto específico)
+        #   https://mi-servidor.com:8008      (URL completa con protocolo)
         # Dejar vacío ("") para usar el servidor local por defecto
-        - SERVER_URL=
+        - SERVER_URL=""
     ports:
       - "3004:3000"
     environment:
-      # Esta variable se configura automáticamente desde los build args
+      # Esta variable debe coincidir con el build arg de arriba
       - SERVER_URL=""
     depends_on:
       - server
