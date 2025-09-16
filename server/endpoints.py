@@ -37,7 +37,7 @@ try:
         mark_recent_repairs, is_locked_change, age_recent_repairs
     )
     from .connection_manager import manager
-    from .compression import _compress_if_needed, _try_decompress
+    from .compression import _compress_if_needed, _try_decompress, _compress_with_metadata
     from .pixel_patterns import select_pixels_by_pattern
     from .session_orchestrator import setup_session_endpoints
     from .repair_endpoints import setup_repair_endpoints
@@ -55,7 +55,7 @@ except ImportError:
         mark_recent_repairs, is_locked_change, age_recent_repairs
     )
     from connection_manager import manager
-    from compression import _compress_if_needed, _try_decompress
+    from compression import _compress_if_needed, _try_decompress, _compress_with_metadata
     from pixel_patterns import select_pixels_by_pattern
     from session_orchestrator import setup_session_endpoints
     from repair_endpoints import setup_repair_endpoints
@@ -361,13 +361,22 @@ def setup_endpoints(app):
             "data": guard.data,
             "stored_at": datetime.utcnow().isoformat()
         }
+
+        # Usar función con metadatos para obtener información de compresión
+        compressed_json, compression_metadata = _compress_with_metadata(payload)
         
-        await manager.send_to_slave(fav_id, payload)
+        # Enviar al slave
+        await manager.slave_connections[fav_id].send_text(compressed_json)
+        
+        # Notificar a UI con información de compresión
         await manager.broadcast_to_ui({
             "type": "guard_upload_sent",
             "slave_id": fav_id,
             "filename": payload["filename"],
-            "pixels": len(guard.data.get('originalPixels', []))
+            "pixels": len(guard.data.get('originalPixels', [])),
+            "originalLength": compression_metadata['originalLength'],
+            "compressedLength": compression_metadata['compressedLength'],
+            "compressed": compression_metadata['compressed']
         })
         
         return {"ok": True, "sent_to": fav_id, "filename": payload["filename"]}
