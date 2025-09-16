@@ -25,8 +25,16 @@ services:
     build:
       context: ./ui
       dockerfile: Dockerfile
+      args:
+        # Configuración del servidor - cambiar aquí para conectar a servidor remoto
+        # Ejemplos: http://192.168.1.100:8008, https://mi-servidor.com:8008
+        # Dejar vacío ("") para usar el servidor local por defecto
+        - SERVER_URL=
     ports:
       - "3004:3000"
+    environment:
+      # Esta variable se configura automáticamente desde los build args
+      - SERVER_URL=""
     depends_on:
       - server
     networks:

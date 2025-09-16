@@ -327,8 +327,10 @@ import PreviewPanel from "../components/PreviewPanel.astro";
         }
 
         connectWebSocket() {
-          const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-          const wsUrl = `${protocol}//${window.location.hostname}:8008/ws/ui`;
+          const serverUrl = this.getServerUrl();
+          const protocol = serverUrl.startsWith('https:') ? 'wss:' : 'ws:';
+          const baseUrl = serverUrl.replace(/^https?:\/\//, '');
+          const wsUrl = `${protocol}//${baseUrl}/ws/ui`;
           
           this.log(`🔌 Connecting to WebSocket: ${wsUrl}`);
           this.ws = new WebSocket(wsUrl);
@@ -2144,7 +2146,16 @@ import PreviewPanel from "../components/PreviewPanel.astro";
         }
         
         apiBase() { 
-          return `${window.location.protocol}//${window.location.hostname}:8008`; 
+          return this.getServerUrl(); 
+        }
+
+        getServerUrl() {
+          // Usar variable de entorno si está configurada, sino usar servidor local por defecto
+          const configuredUrl = import.meta.env.PUBLIC_SERVER_URL;
+          if (configuredUrl && configuredUrl.trim()) {
+            return configuredUrl.trim();
+          }
+          return `${window.location.protocol}//${window.location.hostname}:8008`;
         }
 
         // ======= NUEVOS HELPERS UI DE CUOTAS Y PROGRESO =======

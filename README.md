@@ -243,6 +243,57 @@ server:
 
 ## 🔧 Configuración avanzada
 
+### Configuración de servidor remoto
+
+Por defecto, la interfaz web se conecta al servidor local (`localhost:8008`). Para conectarse a un servidor remoto, edita directamente el archivo `docker-compose.yml`:
+
+#### Configuración en docker-compose.yml
+
+1. **Abrir el archivo `docker-compose.yml`**
+2. **Localizar el servicio `ui`** y la sección `build` > `args`
+3. **Modificar la línea `SERVER_URL`:**
+
+```yaml
+ui:
+  build:
+    context: ./ui
+    dockerfile: Dockerfile
+    args:
+      # Cambiar esta línea para configurar servidor remoto
+      - SERVER_URL="http://tu-servidor:8008"  # ← Editar aquí
+  # ... resto de configuración
+```
+
+**Ejemplos de configuración:**
+
+```yaml
+# Servidor local (por defecto)
+- SERVER_URL=""
+
+# Servidor en red local
+- SERVER_URL="http://192.168.1.100:8008"
+
+# Servidor remoto con dominio
+- SERVER_URL="https://wplace.mi-dominio.com:8008"
+
+# Servidor en Docker con IP específica  
+- SERVER_URL="http://10.0.0.5:8008"
+```
+
+#### Aplicar cambios
+
+Después de modificar el `docker-compose.yml`:
+
+```bash
+# Rebuild solo el servicio UI para aplicar cambios
+docker-compose up -d --build ui
+
+# O rebuild completo si prefieres
+docker-compose up -d --build
+```
+
+> **💡 Tip**: Si usas HTTPS para el servidor, asegúrate de tener certificados SSL válidos configurados para evitar problemas de conexión WebSocket.
+
 ### Variables de entorno
 
 Crea un archivo `.env` en la raíz del proyecto:
@@ -261,6 +312,8 @@ SSL_KEY_PATH=/app/certs/privkey.pem
 # Configuración del servidor
 PYTHONUNBUFFERED=1
 ```
+
+> **Nota**: La configuración del servidor remoto (`SERVER_URL`) se realiza directamente en `docker-compose.yml`, no mediante variables de entorno.
 
 ### Personalización de puertos
 
