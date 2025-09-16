@@ -14,6 +14,7 @@ Funcionalidades:
 
 import uuid
 import asyncio
+import random
 from datetime import datetime
 from typing import Dict, List, Any
 from collections import defaultdict
@@ -310,37 +311,50 @@ def setup_session_endpoints(app):
                         req_id = uuid.uuid4().hex
                         batch_tracker.create(req_id)
                         
-                        async def send_sub(slave_id: str, items: List[dict]):
-                            subtile: Dict[tuple, List[dict]] = defaultdict(list)
+                        async def send_consolidated(slave_id: str, items: List[dict]):
+                            if not items:
+                                return
+                                
+                            # Agrupar por tile (DEBE mantenerse separado como en wplace-api.js)
+                            TILE = 1000
+                            tiles_data: Dict[tuple, List[dict]] = defaultdict(list)
                             for ch in items:
                                 if not isinstance(ch, dict):
                                     continue
                                 try:
                                     x = int(ch.get('x'))
                                     y = int(ch.get('y'))
+                                    tile_key = (x // TILE, y // TILE)
+                                    tiles_data[tile_key].append(ch)
                                 except Exception:
                                     continue
-                                subtile[(x // TILE, y // TILE)].append(ch)
                             
-                            SUB = 40
-                            for (tx, ty), lst in subtile.items():
-                                for i in range(0, len(lst), SUB):
-                                    part = lst[i:i+SUB]
-                                    coords = [{'x': it['x'], 'y': it['y']} for it in part]
-                                    colors = [int(it.get('expectedColor', it.get('color', 0))) for it in part]
+                            # Enviar un request por tile con delays aleatorios
+                            for i, ((tx, ty), tile_items) in enumerate(tiles_data.items()):
+                                if i > 0:
+                                    # Delay aleatorio entre 5-10 segundos entre tiles para evitar rate limiting
+                                    delay = random.uniform(5.0, 10.0)
+                                    await asyncio.sleep(delay)
+                                
+                                # Preparar coords y colors para este tile
+                                coords = [{'x': ch['x'], 'y': ch['y']} for ch in tile_items]
+                                colors = [int(ch.get('expectedColor', ch.get('color', 0))) for ch in tile_items]
+                                
+                                if coords:
                                     payload = {
-                                        'tileX': tx, 
-                                        'tileY': ty, 
+                                        'tileX': tx,
+                                        'tileY': ty,
                                         'coords': coords, 
                                         'colors': colors, 
-                                        'requestId': req_id
+                                        'requestId': req_id,
+                                        'batchSize': len(coords)
                                     }
                                     batch_tracker.assign(req_id, slave_id, payload, 0)
                                     await manager.send_to_slave(slave_id, {'type': 'paintBatch', **payload})
                         
                         for sid, items in queues.items():
                             if items:
-                                await send_sub(sid, items)
+                                await send_consolidated(sid, items)
                         
                         # Esperar resultados con reintentos
                         deadline = asyncio.get_event_loop().time() + 90.0
@@ -363,13 +377,15 @@ def setup_session_endpoints(app):
                                 attempts = batch_tracker.inc_attempts(req_id, sid, key)
                                 
                                 if attempts <= 3:
+                                    # Reasignar lote por tile (mantener formato original)
                                     await manager.send_to_slave(new_sid, {
                                         'type': 'paintBatch',
-                                        'tileX': data['tileX'],
-                                        'tileY': data['tileY'],
+                                        'tileX': data.get('tileX'),
+                                        'tileY': data.get('tileY'),
                                         'coords': data['coords'],
                                         'colors': data['colors'],
-                                        'requestId': req_id
+                                        'requestId': req_id,
+                                        'batchSize': data.get('batchSize', len(data.get('coords', [])))
                                     })
                         
                         await asyncio.sleep(1)
@@ -591,32 +607,45 @@ def setup_session_endpoints(app):
         req_id = uuid.uuid4().hex
         batch_tracker.create(req_id)
         
-        async def _send_sub(slave_id: str, items: List[dict]):
-            subtile: Dict[tuple, List[dict]] = defaultdict(list)
+        # Enviar lotes organizados por tile con delays aleatorios
+        async def _send_consolidated(slave_id: str, items: List[dict]):
+            if not items:
+                return
+                
+            # Agrupar por tile (DEBE mantenerse separado como en wplace-api.js)
+            TILE = 1000
+            tiles_data: Dict[tuple, List[dict]] = defaultdict(list)
             for ch in items:
                 x = int(ch.get('x'))
                 y = int(ch.get('y'))
-                subtile[(x // TILE, y // TILE)].append(ch)
+                tile_key = (x // TILE, y // TILE)
+                tiles_data[tile_key].append(ch)
+            
+            # Enviar un request por tile con delays aleatorios
+            for i, ((tx, ty), tile_items) in enumerate(tiles_data.items()):
+                if i > 0:
+                    # Delay aleatorio entre 5-10 segundos entre tiles para evitar rate limiting
+                    delay = random.uniform(5.0, 10.0)
+                    await asyncio.sleep(delay)
                 
-            SUB = 40
-            for (tx, ty), lst in subtile.items():
-                for i in range(0, len(lst), SUB):
-                    part = lst[i:i+SUB]
-                    coords = [{'x': it['x'], 'y': it['y']} for it in part]
-                    colors = [int(it.get('expectedColor', it.get('color', 0))) for it in part]
-                    payload = {
-                        'tileX': tx, 
-                        'tileY': ty, 
-                        'coords': coords, 
-                        'colors': colors, 
-                        'requestId': req_id
-                    }
-                    batch_tracker.assign(req_id, slave_id, payload, 0)
-                    await manager.send_to_slave(slave_id, {'type': 'paintBatch', **payload})
+                # Preparar coords y colors para este tile
+                coords = [{'x': ch['x'], 'y': ch['y']} for ch in tile_items]
+                colors = [int(ch.get('expectedColor', ch.get('color', 0))) for ch in tile_items]
+                
+                payload = {
+                    'tileX': tx,
+                    'tileY': ty,
+                    'coords': coords, 
+                    'colors': colors, 
+                    'requestId': req_id,
+                    'batchSize': len(coords)
+                }
+                batch_tracker.assign(req_id, slave_id, payload, 0)
+                await manager.send_to_slave(slave_id, {'type': 'paintBatch', **payload})
         
         for sid, items in queues.items():
             if items:
-                await _send_sub(sid, items)
+                await _send_consolidated(sid, items)
         
         # Esperar resultados con reintentos/reasignación
         deadline = asyncio.get_event_loop().time() + 45.0
@@ -637,13 +666,15 @@ def setup_session_endpoints(app):
                 attempts = batch_tracker.inc_attempts(req_id, sid, key)
                 
                 if attempts <= 3:
+                    # Reasignar lote por tile (mantener formato original)
                     await manager.send_to_slave(new_sid, {
                         'type': 'paintBatch',
-                        'tileX': data['tileX'],
-                        'tileY': data['tileY'],
+                        'tileX': data.get('tileX'),
+                        'tileY': data.get('tileY'),
                         'coords': data['coords'],
                         'colors': data['colors'],
-                        'requestId': req_id
+                        'requestId': req_id,
+                        'batchSize': data.get('batchSize', len(data.get('coords', [])))
                     })
         
         return {

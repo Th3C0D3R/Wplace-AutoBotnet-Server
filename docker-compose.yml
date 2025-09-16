@@ -32,12 +32,12 @@ services:
         #   192.168.1.100:8008               (IP con puerto específico)
         #   https://mi-servidor.com:8008      (URL completa con protocolo)
         # Dejar vacío ("") para usar el servidor local por defecto
-        - SERVER_URL=""
+        - SERVER_URL=https://testbotnet.alarisco.xyz  
     ports:
       - "3004:3000"
     environment:
       # Esta variable debe coincidir con el build arg de arriba
-      - SERVER_URL=""
+      - SERVER_URL=https://testbotnet.alarisco.xyz
     depends_on:
       - server
     networks:

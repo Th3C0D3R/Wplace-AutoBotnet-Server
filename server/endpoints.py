@@ -194,7 +194,8 @@ def setup_endpoints(app):
             "tileX": cmd.tileX,
             "tileY": cmd.tileY,
             "coords": cmd.coords,
-            "colors": cmd.colors
+            "colors": cmd.colors,
+            "batchSize": len(cmd.coords)
         })
         return {"ok": True, "queued": len(cmd.coords)}
     
