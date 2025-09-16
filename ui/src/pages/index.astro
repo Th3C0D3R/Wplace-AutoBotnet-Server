@@ -498,11 +498,17 @@ import PreviewPanel from "../components/PreviewPanel.astro";
               break;
             case 'slave_connected':
               this.log(`🤖 Slave connected: ${message.slave_id}`);
-              this.refreshSlaves();
+              // Agregar un pequeño delay para asegurar que el servidor ha actualizado su estado
+              setTimeout(() => {
+                this.refreshSlaves();
+              }, 100);
               break;
             case 'slave_reconnected':
               this.log(`🔄 Slave reconnected: ${message.slave_id}`);
-              this.refreshSlaves();
+              // Agregar un pequeño delay para asegurar que el servidor ha actualizado su estado
+              setTimeout(() => {
+                this.refreshSlaves();
+              }, 100);
               break;
             case 'slave_disconnected':
               this.log(`🔌 Slave disconnected: ${message.slave_id}`);
@@ -675,13 +681,22 @@ import PreviewPanel from "../components/PreviewPanel.astro";
           }
         }
 
-        async refreshSlaves() {
+        async refreshSlaves(retries = 3) {
           try {
             const response = await fetch(`${this.apiBase()}/api/slaves`);
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
             const data = await response.json();
             this.updateSlavesList(data.slaves || []);
           } catch (error) {
             this.log(`Error fetching slaves: ${error}`);
+            // Reintentar después de un breve delay si quedan intentos
+            if (retries > 0) {
+              setTimeout(() => {
+                this.refreshSlaves(retries - 1);
+              }, 500);
+            }
           }
         }
 
