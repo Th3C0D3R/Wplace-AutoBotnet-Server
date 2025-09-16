@@ -1,0 +1,861 @@
+"""Módulo de endpoints HTTP y WebSocket.
+
+Este módulo define todos los endpoints de la API REST y WebSocket del servidor maestro.
+Incluye endpoints para gestión de slaves, proyectos, sesiones, configuración Guard,
+y funcionalidades de reparación y pintado.
+
+Funcionalidades:
+- Endpoints REST para CRUD de proyectos y sesiones
+- Endpoints de configuración Guard y control
+- Endpoints de gestión de slaves y favoritos
+- WebSocket endpoints para comunicación en tiempo real
+- Endpoints de reparación y distribución de trabajo
+- Health check y utilidades
+"""
+
+import json
+import uuid
+import asyncio
+from datetime import datetime
+from typing import Dict, List, Any
+from collections import defaultdict
+from fastapi import HTTPException, WebSocket, WebSocketDisconnect
+from sqlalchemy.exc import SQLAlchemyError
+import logging
+
+try:
+    # Importaciones relativas
+    from .models import (
+        ProjectConfig, SessionConfig, GuardUpload, SelectedSlavesUpdate,
+        GuardConfigUpdate, GuardRepairRequest, PixelBatch,
+        ProjectModel, SessionModel, SessionLocal, init_db
+    )
+    from .storage import (
+        connected_slaves, active_projects, active_sessions, guard_config,
+        last_guard_upload, ui_selected_slaves, active_protect_loops,
+        batch_tracker, _last_preview_timestamp, _last_preview_lock,
+        mark_recent_repairs, is_locked_change, age_recent_repairs
+    )
+    from .connection_manager import manager
+    from .compression import _compress_if_needed, _try_decompress
+    from .pixel_patterns import select_pixels_by_pattern
+    from .session_orchestrator import setup_session_endpoints
+    from .repair_endpoints import setup_repair_endpoints
+except ImportError:
+    # Importaciones absolutas
+    from models import (
+        ProjectConfig, SessionConfig, GuardUpload, SelectedSlavesUpdate,
+        GuardConfigUpdate, GuardRepairRequest, PixelBatch,
+        ProjectModel, SessionModel, SessionLocal, init_db
+    )
+    from storage import (
+        connected_slaves, active_projects, active_sessions, guard_config,
+        last_guard_upload, ui_selected_slaves, active_protect_loops,
+        batch_tracker, _last_preview_timestamp, _last_preview_lock,
+        mark_recent_repairs, is_locked_change, age_recent_repairs
+    )
+    from connection_manager import manager
+    from compression import _compress_if_needed, _try_decompress
+    from pixel_patterns import select_pixels_by_pattern
+    from session_orchestrator import setup_session_endpoints
+    from repair_endpoints import setup_repair_endpoints
+
+logger = logging.getLogger(__name__)
+
+
+def setup_endpoints(app):
+    """Configurar todos los endpoints en la aplicación FastAPI."""
+    
+    # Configurar endpoints de módulos especializados
+    setup_session_endpoints(app)
+    setup_repair_endpoints(app)
+    
+    # === Eventos de aplicación ===
+    
+    @app.on_event("startup")
+    async def on_startup():
+        """Inicializar la base de datos y cargar proyectos/sesiones persistidos."""
+        init_db()
+        db = SessionLocal()
+        try:
+            # Cargar proyectos
+            for p in db.query(ProjectModel).all():
+                active_projects[p.id] = ProjectConfig(
+                    name=p.name, 
+                    mode=p.mode, 
+                    config=p.config, 
+                    chunks=[]
+                )
+            # Cargar sesiones (mantener created, running, paused)
+            persisted = db.query(SessionModel).all()
+            for s in persisted:
+                active_sessions[s.id] = SessionConfig(
+                    project_id=s.project_id, 
+                    slave_ids=list(s.slave_ids or []), 
+                    strategy=s.strategy
+                )
+            logger.info(f"Loaded {len(active_projects)} projects and {len(active_sessions)} sessions from DB")
+        except SQLAlchemyError as e:
+            logger.error(f"Startup DB load error: {e}")
+        finally:
+            db.close()
+    
+    # === Endpoints de slaves ===
+    
+    @app.get("/api/slaves")
+    async def get_slaves():
+        """Obtener lista de slaves conectados."""
+        return {"slaves": list(connected_slaves.values())}
+    
+    @app.post("/api/slaves/{slave_id}/favorite")
+    async def set_favorite_slave(slave_id: str):
+        """Marcar un slave como favorito (solo uno a la vez)."""
+        if slave_id not in connected_slaves:
+            raise HTTPException(status_code=404, detail="Slave not found")
+        
+        # Si ya es el favorito actual, reenviar config y devolver rápido
+        already_fav = bool(getattr(connected_slaves[slave_id], 'is_favorite', False))
+        if already_fav:
+            # Refresco opcional de guardConfig / guardData
+            try:
+                await manager.send_to_slave(slave_id, {
+                    "type": "guardConfig",
+                    "config": guard_config,
+                    "timestamp": datetime.utcnow().isoformat()
+                })
+                if last_guard_upload:
+                    await manager.send_to_slave(slave_id, {
+                        "type": "guardData",
+                        "filename": last_guard_upload.get("filename", "uploaded_guard.json"),
+                        "guardData": last_guard_upload.get("data", {}),
+                        "timestamp": datetime.utcnow().isoformat()
+                    })
+            except Exception as e:
+                logger.error(f"Error re-sending data to existing favorite {slave_id}: {e}")
+            return {"ok": True, "favorite": slave_id, "unchanged": True}
+        
+        # Snapshot de favoritos previos para evitar RuntimeError
+        previous_favorites = [
+            sid for sid, s in list(connected_slaves.items()) 
+            if getattr(s, 'is_favorite', False) and sid != slave_id
+        ]
+        
+        # Desmarcar antiguos favoritos
+        for prev_id in previous_favorites:
+            if prev_id in connected_slaves:
+                try:
+                    connected_slaves[prev_id].is_favorite = False
+                    await manager.send_to_slave(prev_id, {"type": "setFavorite", "isFavorite": False})
+                except Exception as e:
+                    logger.warning(f"Failed notifying old favorite {prev_id}: {e}")
+        
+        # Establecer nuevo favorito
+        connected_slaves[slave_id].is_favorite = True
+        try:
+            await manager.send_to_slave(slave_id, {"type": "setFavorite", "isFavorite": True})
+        except Exception as e:
+            logger.error(f"Error notifying new favorite flag to {slave_id}: {e}")
+        
+        # Enviar configuración Guard y guardData
+        try:
+            await manager.send_to_slave(slave_id, {
+                "type": "guardConfig",
+                "config": guard_config,
+                "timestamp": datetime.utcnow().isoformat()
+            })
+        except Exception as e:
+            logger.error(f"Error sending guard config to new favorite {slave_id}: {e}")
+            
+        try:
+            if last_guard_upload:
+                await manager.send_to_slave(slave_id, {
+                    "type": "guardData",
+                    "filename": last_guard_upload.get("filename", "uploaded_guard.json"),
+                    "guardData": last_guard_upload.get("data", {}),
+                    "timestamp": datetime.utcnow().isoformat()
+                })
+        except Exception as e:
+            logger.error(f"Error sending guardData to new favorite {slave_id}: {e}")
+        
+        # Notificar UIs
+        await manager.broadcast_to_ui({"type": "slave_favorite", "slave_id": slave_id})
+        return {"ok": True, "favorite": slave_id, "demoted": previous_favorites}
+    
+    @app.post("/api/slaves/{slave_id}/paint")
+    async def paint_with_slave(slave_id: str, cmd: PixelBatch):
+        """Enviar comando de pintado a un slave específico."""
+        if slave_id not in connected_slaves:
+            raise HTTPException(status_code=404, detail="Slave not found")
+        if len(cmd.coords) != len(cmd.colors) or len(cmd.coords) == 0:
+            raise HTTPException(status_code=400, detail="coords/colors length mismatch or empty")
+            
+        await manager.send_to_slave(slave_id, {
+            "type": "paintBatch",
+            "tileX": cmd.tileX,
+            "tileY": cmd.tileY,
+            "coords": cmd.coords,
+            "colors": cmd.colors
+        })
+        return {"ok": True, "queued": len(cmd.coords)}
+    
+    # === Endpoints de configuración Guard ===
+    
+    @app.get("/api/guard/config")
+    async def get_guard_config():
+        """Obtener configuración global Guard."""
+        return {"config": guard_config}
+    
+    @app.post("/api/guard/config")
+    async def update_guard_config(cfg: GuardConfigUpdate):
+        """Actualizar configuración Guard y broadcast al slave favorito."""
+        changed = {}
+        for field, value in cfg.dict(exclude_unset=True).items():
+            guard_config[field] = value
+            changed[field] = value
+        
+        # Localizar slave favorito
+        fav_id = None
+        for sid, sinfo in connected_slaves.items():
+            if getattr(sinfo, 'is_favorite', False):
+                fav_id = sid
+                break
+                
+        if fav_id:
+            await manager.send_to_slave(fav_id, {
+                "type": "guardConfig",
+                "config": guard_config,
+                "changed": changed,
+                "timestamp": datetime.utcnow().isoformat()
+            })
+            
+        # Notificar a UIs
+        await manager.broadcast_to_ui({
+            "type": "guard_config",
+            "config": guard_config,
+            "changed": changed
+        })
+        
+        return {"ok": True, "config": guard_config, "changed": changed}
+    
+    @app.post("/api/guard/check")
+    async def guard_force_check():
+        """Forzar análisis inmediato en el slave favorito."""
+        fav_id = next((sid for sid, s in connected_slaves.items() if getattr(s, 'is_favorite', False)), None)
+        if not fav_id:
+            if connected_slaves:
+                fav_id = next(iter(connected_slaves.keys()))
+                logger.warning(f"[GUARD CHECK] No favorite slave; usando fallback {fav_id}")
+            else:
+                raise HTTPException(status_code=400, detail="No favorite slave connected")
+                
+        await manager.send_to_slave(fav_id, {"type": "guardControl", "action": "check"})
+        return {"ok": True, "requested": fav_id}
+    
+    @app.post("/api/guard/repair")
+    async def guard_force_repair(req: GuardRepairRequest):
+        """Solicitar reparación inmediata en el slave favorito."""
+        fav_id = next((sid for sid, s in connected_slaves.items() if getattr(s, 'is_favorite', False)), None)
+        if not fav_id:
+            raise HTTPException(status_code=400, detail="No favorite slave connected")
+            
+        payload = {"type": "guardControl", "action": "repair", "params": req.dict(exclude_unset=True)}
+        await manager.send_to_slave(fav_id, payload)
+        return {"ok": True, "requested": fav_id, "params": payload.get("params")}
+    
+    @app.post("/api/guard/stop")
+    async def guard_stop():
+        """Detener actividad de pintura/guard en el slave favorito."""
+        fav_id = next((sid for sid, s in connected_slaves.items() if getattr(s, 'is_favorite', False)), None)
+        target_id = fav_id
+        
+        if not target_id:
+            if connected_slaves:
+                target_id = next(iter(connected_slaves.keys()))
+                logger.warning(f"[GUARD STOP] No favorite slave; usando fallback {target_id}")
+            else:
+                return {"ok": True, "requested": None, "skipped": "no_slave_connected"}
+                
+        await manager.send_to_slave(target_id, {"type": "control", "action": "stop"})
+        return {"ok": True, "requested": target_id}
+    
+    @app.post("/api/guard/clear")
+    async def guard_clear_state():
+        """Limpiar estado Guard en slave favorito y servidor."""
+        fav_id = next((sid for sid, s in connected_slaves.items() if getattr(s, 'is_favorite', False)), None)
+        target_id = fav_id
+        
+        if not target_id:
+            if connected_slaves:
+                target_id = next(iter(connected_slaves.keys()))
+                logger.warning(f"[GUARD CLEAR] No favorite slave; usando fallback {target_id}")
+            else:
+                target_id = None
+        
+        # Orden de limpieza al slave
+        if target_id:
+            await manager.send_to_slave(target_id, {"type": "guardControl", "action": "clear"})
+        
+        # Limpiar telemetría en servidor
+        try:
+            sinfo = connected_slaves.get(target_id) if target_id else None
+            if sinfo and isinstance(sinfo.telemetry, dict):
+                sinfo.telemetry.pop('preview_data', None)
+                for k in ['correctPixels', 'incorrectPixels', 'missingPixels']:
+                    sinfo.telemetry.pop(k, None)
+        except Exception as e:
+            logger.error(f"Error clearing telemetry for {target_id}: {e}")
+        
+        # Limpiar último guardData
+        global last_guard_upload
+        last_guard_upload = None
+        
+        # Notificar UIs
+        await manager.broadcast_to_ui({
+            "type": "guard_cleared",
+            "slave_id": target_id,
+            "guardDataCleared": True
+        })
+        
+        resp = {"ok": True, "cleared": target_id}
+        if not target_id:
+            resp["skipped"] = "no_slave_connected"
+        return resp
+    
+    @app.get("/api/guard/preview")
+    async def guard_get_preview():
+        """Obtener último preview_data del slave favorito."""
+        fav = next(((sid, s) for sid, s in connected_slaves.items() if getattr(s, 'is_favorite', False)), None)
+        if not fav:
+            raise HTTPException(status_code=404, detail="No favorite slave connected")
+            
+        fav_id, fav_state = fav
+        pdata = fav_state.telemetry.get('preview_data') if fav_state.telemetry else None
+        if not pdata:
+            raise HTTPException(status_code=404, detail="No preview_data yet")
+            
+        return {"ok": True, "slave_id": fav_id, "data": pdata}
+    
+    @app.post("/api/guard/upload")
+    async def upload_guard(guard: GuardUpload):
+        """Subir configuración Guard y enviar al slave favorito."""
+        # Localizar slave favorito
+        fav_id = None
+        for sid, sinfo in connected_slaves.items():
+            if getattr(sinfo, 'is_favorite', False):
+                fav_id = sid
+                break
+                
+        if not fav_id:
+            raise HTTPException(status_code=400, detail="No favorite slave connected")
+        
+        # Empaquetar datos
+        payload = {
+            "type": "guardData",
+            "filename": guard.filename or "uploaded_guard.json",
+            "guardData": guard.data,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+        logger.info(f"[GUARD UPLOAD] Enviando guardData a slave favorito {fav_id} (pixels={len(guard.data.get('originalPixels', []))})")
+        
+        # Persistir último guardData
+        global last_guard_upload
+        last_guard_upload = {
+            "filename": guard.filename or "uploaded_guard.json",
+            "data": guard.data,
+            "stored_at": datetime.utcnow().isoformat()
+        }
+        
+        await manager.send_to_slave(fav_id, payload)
+        await manager.broadcast_to_ui({
+            "type": "guard_upload_sent",
+            "slave_id": fav_id,
+            "filename": payload["filename"],
+            "pixels": len(guard.data.get('originalPixels', []))
+        })
+        
+        return {"ok": True, "sent_to": fav_id, "filename": payload["filename"]}
+    
+    # === Endpoints de UI ===
+    
+    @app.get("/api/ui/selected-slaves")
+    async def get_ui_selected_slaves():
+        """Obtener slaves seleccionados en UI."""
+        return {"slave_ids": list(ui_selected_slaves)}
+    
+    @app.post("/api/ui/selected-slaves")
+    async def set_ui_selected_slaves(sel: SelectedSlavesUpdate):
+        """Establecer slaves seleccionados en UI."""
+        global ui_selected_slaves
+        try:
+            ui_selected_slaves = list(dict.fromkeys(sel.slave_ids))
+        except Exception:
+            ui_selected_slaves = sel.slave_ids or []
+            
+        await manager.broadcast_to_ui({"type": "ui_selected_slaves", "slave_ids": ui_selected_slaves})
+        return {"ok": True, "slave_ids": ui_selected_slaves}
+    
+    # === Endpoints de proyectos ===
+    
+    @app.get("/api/projects")
+    async def get_projects():
+        """Obtener lista de proyectos activos."""
+        return {"projects": list(active_projects.values())}
+    
+    @app.post("/api/projects")
+    async def create_project(project: ProjectConfig):
+        """Crear nuevo proyecto."""
+        project_id = str(uuid.uuid4())
+        active_projects[project_id] = project
+        
+        # Persistir en DB
+        db = SessionLocal()
+        try:
+            db.add(ProjectModel(
+                id=project_id, 
+                name=project.name, 
+                mode=project.mode, 
+                config=project.config
+            ))
+            db.commit()
+        except SQLAlchemyError as e:
+            logger.error(f"DB save project error: {e}")
+            db.rollback()
+        finally:
+            db.close()
+            
+        return {"project_id": project_id, "project": project}
+    
+    @app.get("/api/projects/{project_id}")
+    async def get_project(project_id: str):
+        """Obtener proyecto específico."""
+        if project_id not in active_projects:
+            raise HTTPException(status_code=404, detail="Project not found")
+        return active_projects[project_id]
+    
+    @app.post("/api/projects/clear-all")
+    async def clear_all_projects_and_sessions():
+        """Eliminar todos los proyectos y sesiones."""
+        # Detener bucles activos
+        try:
+            for sid, loop in list(active_protect_loops.items()):
+                try:
+                    loop["running"] = False
+                except Exception:
+                    pass
+            active_protect_loops.clear()
+        except Exception as e:
+            logger.error(f"Error stopping active loops: {e}")
+        
+        # Limpiar memoria
+        active_projects.clear()
+        active_sessions.clear()
+        
+        # Borrar de DB
+        db = SessionLocal()
+        proj_deleted = sess_deleted = 0
+        try:
+            sess_deleted = db.query(SessionModel).delete()
+            proj_deleted = db.query(ProjectModel).delete()
+            db.commit()
+        except SQLAlchemyError as e:
+            logger.error(f"DB clear-all error: {e}")
+            db.rollback()
+        finally:
+            db.close()
+        
+        # Limpiar último guardData
+        global last_guard_upload
+        last_guard_upload = None
+        
+        # Notificar UI
+        await manager.broadcast_to_ui({
+            "type": "projects_cleared",
+            "sessions_deleted": sess_deleted,
+            "projects_deleted": proj_deleted
+        })
+        
+        return {"ok": True, "projects_deleted": proj_deleted, "sessions_deleted": sess_deleted}
+    
+    # === Endpoints de sesiones ===
+    
+    @app.post("/api/sessions")
+    async def create_session(session: SessionConfig):
+        """Crear nueva sesión de trabajo."""
+        session_id = str(uuid.uuid4())
+        active_sessions[session_id] = session
+        
+        # Persistir en DB
+        db = SessionLocal()
+        try:
+            db.add(SessionModel(
+                id=session_id, 
+                project_id=session.project_id, 
+                slave_ids=session.slave_ids, 
+                strategy=session.strategy, 
+                status='created'
+            ))
+            db.commit()
+        except SQLAlchemyError as e:
+            logger.error(f"DB save session error: {e}")
+            db.rollback()
+        finally:
+            db.close()
+            
+        return {"session_id": session_id, "session": session}
+    
+    # === Health check ===
+    
+    @app.get("/health")
+    async def health_check():
+        """Health check endpoint."""
+        return {"status": "healthy", "timestamp": datetime.now()}
+    
+    # === WebSocket endpoints ===
+    
+    @app.websocket("/ws/slave")
+    async def websocket_slave_endpoint(websocket: WebSocket):
+        """WebSocket endpoint para conexiones de slaves."""
+        # Usar ID proporcionado por cliente o generar uno aleatorio
+        requested_id = websocket.query_params.get('id') if hasattr(websocket, 'query_params') else None
+        slave_id = requested_id or f"SLV_{uuid.uuid4().hex[:8].upper()}"
+        
+        await manager.connect_slave(websocket, slave_id)
+        
+        try:
+            # Enviar confirmación de conexión
+            await websocket.send_text(_compress_if_needed({
+                "type": "connected",
+                "slave_id": slave_id
+            }))
+            
+            # Notificar si es favorito
+            if connected_slaves[slave_id].is_favorite:
+                await websocket.send_text(_compress_if_needed({
+                    "type": "favorite_status",
+                    "is_favorite": True
+                }))
+            
+            while True:
+                data = await websocket.receive_text()
+                message = json.loads(data)
+                message = _try_decompress(message)
+                
+                # Actualizar info del slave
+                if slave_id in connected_slaves:
+                    connected_slaves[slave_id].last_seen = datetime.now()
+                    
+                    await _handle_slave_message(slave_id, message)
+                    
+        except WebSocketDisconnect:
+            await manager.disconnect_slave(slave_id)
+        except Exception as e:
+            logger.error(f"Error in slave websocket {slave_id}: {e}")
+            await manager.disconnect_slave(slave_id)
+    
+    @app.websocket("/ws/ui")
+    async def websocket_ui_endpoint(websocket: WebSocket):
+        """WebSocket endpoint para interfaces de usuario."""
+        await manager.connect_ui(websocket)
+        
+        try:
+            # Enviar estado inicial
+            await _send_initial_ui_state(websocket)
+            
+            while True:
+                # Mantener conexión viva
+                await websocket.receive_text()
+                
+        except WebSocketDisconnect:
+            await manager.disconnect_ui(websocket)
+        except Exception as e:
+            logger.error(f"Error in UI websocket: {e}")
+            await manager.disconnect_ui(websocket)
+
+
+async def _handle_slave_message(slave_id: str, message: Dict[str, Any]):
+    """Manejar mensaje recibido de un slave."""
+    msg_type = message.get("type")
+    
+    if msg_type == "telemetry":
+        await _handle_telemetry_message(slave_id, message)
+    elif msg_type == "status":
+        await _handle_status_message(slave_id, message)
+    elif msg_type == "preview_data":
+        await _handle_preview_data_message(slave_id, message)
+    elif msg_type == "repair_suggestion":
+        await _handle_repair_suggestion_message(slave_id, message)
+    elif msg_type == "repair_ack":
+        await _handle_repair_ack_message(slave_id, message)
+    elif msg_type == "repair_progress":
+        await _handle_repair_progress_message(slave_id, message)
+    elif msg_type == "repair_complete":
+        await _handle_repair_complete_message(slave_id, message)
+    elif msg_type == "repair_error":
+        await _handle_repair_error_message(slave_id, message)
+    elif msg_type == "paint_progress":
+        await _handle_paint_progress_message(slave_id, message)
+    elif msg_type == "paint_result":
+        await _handle_paint_result_message(slave_id, message)
+
+
+async def _handle_telemetry_message(slave_id: str, message: Dict[str, Any]):
+    """Manejar mensaje de telemetría."""
+    telem = message.get("data", {})
+    
+    # Normalizar alias previewData -> preview_data
+    if 'previewData' in telem and 'preview_data' not in telem:
+        telem['preview_data'] = telem['previewData']
+    
+    # Fusionar con telemetría existente
+    existing = connected_slaves[slave_id].telemetry if isinstance(connected_slaves[slave_id].telemetry, dict) else {}
+    
+    def _changes_are_detailed(changes):
+        try:
+            return (isinstance(changes, list) and len(changes) > 0 and 
+                   isinstance(changes[0], dict) and ('x' in changes[0]))
+        except Exception:
+            return False
+    
+    # Decidir si reemplazar preview_data
+    if 'preview_data' in telem:
+        new_pd = telem.get('preview_data') or {}
+        old_pd = existing.get('preview_data') or {}
+        new_changes = new_pd.get('changes', []) if isinstance(new_pd, dict) else []
+        old_changes = old_pd.get('changes', []) if isinstance(old_pd, dict) else []
+        new_good = _changes_are_detailed(new_changes)
+        old_good = _changes_are_detailed(old_changes)
+        
+        if new_good or (not old_good):
+            existing['preview_data'] = new_pd
+        
+        telem = {k: v for k, v in telem.items() if k != 'preview_data'}
+    
+    # Actualizar resto de campos
+    existing.update(telem)
+    connected_slaves[slave_id].telemetry = existing
+    
+    # Broadcast a UI
+    await manager.broadcast_to_ui({
+        "type": "telemetry_update",
+        "slave_id": slave_id,
+        "telemetry": connected_slaves[slave_id].telemetry
+    })
+
+
+async def _handle_status_message(slave_id: str, message: Dict[str, Any]):
+    """Manejar mensaje de estado."""
+    connected_slaves[slave_id].status = message.get("status", "idle")
+    await manager.broadcast_to_ui({
+        "type": "status_update",
+        "slave_id": slave_id,
+        "status": message.get("status", "idle")
+    })
+
+
+async def _handle_preview_data_message(slave_id: str, message: Dict[str, Any]):
+    """Manejar mensaje de preview_data del favorito."""
+    if connected_slaves[slave_id].is_favorite:
+        preview_payload = message.get("data", {})
+        
+        # Envejecer bloqueos
+        try:
+            age_recent_repairs()
+        except Exception:
+            pass
+        
+        try:
+            connected_slaves[slave_id].telemetry["preview_data"] = preview_payload
+            with _last_preview_lock:
+                _last_preview_timestamp[slave_id] = datetime.utcnow().timestamp()
+        except Exception as e:
+            logger.error(f"Failed to persist preview_data for {slave_id}: {e}")
+        
+        await manager.broadcast_to_ui({
+            "type": "preview_data",
+            "slave_id": slave_id,
+            "data": preview_payload
+        })
+
+
+async def _handle_repair_suggestion_message(slave_id: str, message: Dict[str, Any]):
+    """Manejar sugerencia de reparación."""
+    await manager.broadcast_to_ui({
+        "type": "repair_suggestion",
+        "slave_id": slave_id,
+        "pixels": message.get("pixels", []),
+        "totalDiffs": message.get("totalDiffs", 0)
+    })
+
+
+async def _handle_repair_ack_message(slave_id: str, message: Dict[str, Any]):
+    """Manejar acknowledgment de reparación."""
+    await manager.broadcast_to_ui({
+        "type": "repair_ack",
+        "slave_id": slave_id,
+        "total_repairs": message.get("total_repairs", 0),
+        "source": message.get("source", "unknown")
+    })
+
+
+async def _handle_repair_progress_message(slave_id: str, message: Dict[str, Any]):
+    """Manejar progreso de reparación."""
+    await manager.broadcast_to_ui({
+        "type": "repair_progress",
+        "slave_id": slave_id,
+        "completed": message.get("completed", 0),
+        "total": message.get("total", 0),
+        "source": message.get("source", "unknown")
+    })
+
+
+async def _handle_repair_complete_message(slave_id: str, message: Dict[str, Any]):
+    """Manejar finalización de reparación."""
+    await manager.broadcast_to_ui({
+        "type": "repair_complete",
+        "slave_id": slave_id,
+        "completed": message.get("completed", 0),
+        "source": message.get("source", "unknown")
+    })
+
+
+async def _handle_repair_error_message(slave_id: str, message: Dict[str, Any]):
+    """Manejar error de reparación."""
+    await manager.broadcast_to_ui({
+        "type": "repair_error",
+        "slave_id": slave_id,
+        "error": message.get("error", "Unknown error"),
+        "source": message.get("source", "unknown")
+    })
+
+
+async def _handle_paint_progress_message(slave_id: str, message: Dict[str, Any]):
+    """Manejar progreso de pintado."""
+    await manager.broadcast_to_ui({
+        "type": "paint_progress",
+        "slave_id": slave_id,
+        "is_favorite": bool(connected_slaves[slave_id].is_favorite),
+        **{k: v for k, v in message.items() if k != 'type'}
+    })
+
+
+async def _handle_paint_result_message(slave_id: str, message: Dict[str, Any]):
+    """Manejar resultado de pintado."""
+    # Tracking de reintentos
+    req_id = message.get('requestId')
+    try:
+        tX = int(message.get('tileX'))
+        tY = int(message.get('tileY'))
+    except Exception:
+        tX = tY = 0
+        
+    coords = message.get('coords') or []
+    
+    if req_id:
+        batch_tracker.mark(req_id, slave_id, tX, tY, coords, bool(message.get('ok')))
+    
+    # Si la pintura fue OK, marcar coords como reparadas recientemente
+    try:
+        if bool(message.get('ok')) and coords:
+            mark_recent_repairs(coords)
+    except Exception:
+        pass
+    
+    await manager.broadcast_to_ui({
+        "type": "paint_result",
+        "slave_id": slave_id,
+        "is_favorite": bool(connected_slaves[slave_id].is_favorite),
+        **{k: v for k, v in message.items() if k != 'type'}
+    })
+
+
+async def _send_initial_ui_state(websocket: WebSocket):
+    """Enviar estado inicial a una conexión UI."""
+    slaves_data = []
+    for slave in connected_slaves.values():
+        slave_dict = slave.dict()
+        slave_dict['connected_at'] = slave_dict['connected_at'].isoformat()
+        slave_dict['last_seen'] = slave_dict['last_seen'].isoformat()
+        slaves_data.append(slave_dict)
+    
+    # Cargar sesiones y proyectos de DB
+    db = SessionLocal()
+    try:
+        projects_list = []
+        for p in db.query(ProjectModel).all():
+            projects_list.append({
+                "id": p.id,
+                "name": p.name,
+                "mode": p.mode,
+                "config": p.config
+            })
+            
+        sessions_list = []
+        for s in db.query(SessionModel).all():
+            sessions_list.append({
+                "id": s.id,
+                "project_id": s.project_id,
+                "slave_ids": list(s.slave_ids or []),
+                "strategy": s.strategy,
+                "status": s.status,
+            })
+    finally:
+        db.close()
+    
+    # Hidratar colores disponibles
+    def _normalize_colors(arr):
+        out = []
+        try:
+            for i, c in enumerate(arr or []):
+                if isinstance(c, dict):
+                    cid = c.get('id', i)
+                    r = int(c.get('r', 0))
+                    g = int(c.get('g', 0))
+                    b = int(c.get('b', 0))
+                    out.append({'id': cid, 'r': r, 'g': g, 'b': b})
+        except Exception:
+            pass
+        return out
+    
+    initial_available_colors = []
+    
+    # 1) Preferir colores del favorito
+    try:
+        fav_id = next((sid for sid, s in connected_slaves.items() if getattr(s, 'is_favorite', False)), None)
+        if fav_id:
+            fav = connected_slaves.get(fav_id)
+            if fav and isinstance(fav.telemetry, dict):
+                pd = fav.telemetry.get('preview_data') or {}
+                initial_available_colors = _normalize_colors(pd.get('availableColors') or [])
+    except Exception:
+        initial_available_colors = []
+    
+    # 2) Si vacío, buscar en cualquier slave
+    if not initial_available_colors:
+        try:
+            for s in connected_slaves.values():
+                if isinstance(s.telemetry, dict):
+                    pd = s.telemetry.get('preview_data') or {}
+                    colors = _normalize_colors(pd.get('availableColors') or [])
+                    if colors:
+                        initial_available_colors = colors
+                        break
+        except Exception:
+            pass
+    
+    # 3) Si aún vacío, usar último guard upload
+    if not initial_available_colors:
+        try:
+            if last_guard_upload and isinstance(last_guard_upload.get('data'), dict):
+                initial_available_colors = _normalize_colors(last_guard_upload['data'].get('colors') or [])
+        except Exception:
+            pass
+    
+    await websocket.send_text(json.dumps({
+        "type": "initial_state",
+        "slaves": slaves_data,
+        "projects": projects_list,
+        "sessions": sessions_list,
+        "selected_slaves": list(ui_selected_slaves),
+        "available_colors": initial_available_colors
+    }))
