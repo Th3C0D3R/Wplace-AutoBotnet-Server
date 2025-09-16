@@ -20,7 +20,7 @@ from typing import Dict, Any, Set
 logger = logging.getLogger(__name__)
 
 # Configuración de compresión
-COMPRESSION_THRESHOLD = 20 * 1024 * 1024  # 20MB (bytes)
+COMPRESSION_THRESHOLD = 5 * 1024 * 1024  # 5MB (bytes)
 
 # Tipos que nunca deben comprimirse (órdenes de pintado / control latencia-crítica)
 NO_COMPRESS_TYPES: Set[str] = {
