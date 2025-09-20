@@ -50,13 +50,13 @@ def _compress_if_needed(message: Dict[str, Any]) -> str:
     """
     try:
         if not isinstance(message, dict) or message.get('type') == '__compressed__':
-            return json.dumps(message)
+            return json.dumps(message, default=str)
             
         # Saltar compresión para tipos críticos
         if message.get('type') in NO_COMPRESS_TYPES:
-            return json.dumps(message, separators=(',', ':'), ensure_ascii=False)
+            return json.dumps(message, separators=(',', ':'), ensure_ascii=False, default=str)
             
-        raw = json.dumps(message, separators=(',', ':'), ensure_ascii=False).encode('utf-8')
+        raw = json.dumps(message, separators=(',', ':'), ensure_ascii=False, default=str).encode('utf-8')
         
         if len(raw) < COMPRESSION_THRESHOLD:
             return raw.decode('utf-8')
@@ -73,12 +73,12 @@ def _compress_if_needed(message: Dict[str, Any]) -> str:
             'payload': b64
         }
         
-        return json.dumps(wrapper, separators=(',', ':'), ensure_ascii=False)
+        return json.dumps(wrapper, separators=(',', ':'), ensure_ascii=False, default=str)
         
     except Exception as e:
         logger.error(f"Compression error: {e}")
         try:
-            return json.dumps(message)
+            return json.dumps(message, default=str)
         except Exception:
             return '{}'
 
@@ -103,19 +103,19 @@ def _compress_with_metadata(message: Dict[str, Any]) -> tuple[str, Dict[str, Any
     
     try:
         if not isinstance(message, dict) or message.get('type') == '__compressed__':
-            json_str = json.dumps(message)
+            json_str = json.dumps(message, default=str)
             metadata['originalLength'] = len(json_str.encode('utf-8'))
             metadata['compressedLength'] = metadata['originalLength']
             return json_str, metadata
             
         # Saltar compresión para tipos críticos
         if message.get('type') in NO_COMPRESS_TYPES:
-            json_str = json.dumps(message, separators=(',', ':'), ensure_ascii=False)
+            json_str = json.dumps(message, separators=(',', ':'), ensure_ascii=False, default=str)
             metadata['originalLength'] = len(json_str.encode('utf-8'))
             metadata['compressedLength'] = metadata['originalLength']
             return json_str, metadata
             
-        raw = json.dumps(message, separators=(',', ':'), ensure_ascii=False).encode('utf-8')
+        raw = json.dumps(message, separators=(',', ':'), ensure_ascii=False, default=str).encode('utf-8')
         metadata['originalLength'] = len(raw)
         
         if len(raw) < COMPRESSION_THRESHOLD:
@@ -134,7 +134,7 @@ def _compress_with_metadata(message: Dict[str, Any]) -> tuple[str, Dict[str, Any
             'payload': b64
         }
         
-        wrapper_json = json.dumps(wrapper, separators=(',', ':'), ensure_ascii=False)
+        wrapper_json = json.dumps(wrapper, separators=(',', ':'), ensure_ascii=False, default=str)
         metadata['compressedLength'] = len(wrapper_json.encode('utf-8'))
         metadata['compressed'] = True
         
@@ -143,7 +143,7 @@ def _compress_with_metadata(message: Dict[str, Any]) -> tuple[str, Dict[str, Any
     except Exception as e:
         logger.error(f"Compression error: {e}")
         try:
-            fallback = json.dumps(message)
+            fallback = json.dumps(message, default=str)
             metadata['originalLength'] = len(fallback.encode('utf-8'))
             metadata['compressedLength'] = metadata['originalLength']
             return fallback, metadata

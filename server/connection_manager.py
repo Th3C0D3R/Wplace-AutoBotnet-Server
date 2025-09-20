@@ -72,7 +72,7 @@ class ConnectionManager:
             await self.broadcast_to_ui({"type": "slave_connected", "slave_id": slave_id})
             
             if is_first_slave:
-                await self.broadcast_to_ui({"type": "favorite_set", "slave_id": slave_id})
+                await self.broadcast_to_ui({"type": "slave_favorite", "slave_id": slave_id})
                 logger.info(f"Slave {slave_id} connected and set as favorite (first slave)")
                 
                 # Enviar configuración guard actual al favorito

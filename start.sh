@@ -88,12 +88,11 @@ if [ "$FRONTEND_ONLY" = true ]; then
         exit 1
     fi
 else
-    echo "🔨 Building and starting all services..."
-    echo "📋 Stopping any existing containers..."
-    docker-compose down --remove-orphans
-    
-    echo "🏗️ Building images (this may take a few minutes)..."
-    if ! docker-compose build --no-cache; then
+    echo "🔨 Building and starting all services (without stopping database)..."
+    # IMPORTANT: Avoid bringing the whole stack down to prevent Postgres fast shutdowns and WS 1012 disconnects
+    # Build only app images; redis/postgres use official images and don't require build
+    echo "🏗️ Building images (server and ui, this may take a few minutes)..."
+    if ! docker-compose build --no-cache server ui; then
         echo "❌ Build failed. Check the logs above for details."
         echo "💡 Common solutions:"
         echo "   - Ensure Docker has enough memory (4GB+ recommended)"
@@ -102,8 +101,9 @@ else
         exit 1
     fi
     
-    echo "🚀 Starting containers..."
-    if ! docker-compose up -d; then
+    echo "🚀 Starting/Updating containers..."
+    # Up only recreates services that changed; Postgres remains running if unchanged
+    if ! docker-compose up -d server ui redis postgres; then
         echo "❌ Failed to start containers. Checking logs..."
         docker-compose logs
         exit 1
@@ -119,8 +119,8 @@ echo "🔍 Checking service health..."
 
 if [ "$FRONTEND_ONLY" = true ]; then
     # Check only Astro frontend
-    if curl -f http://localhost:3000 > /dev/null 2>&1; then
-        echo "✅ Astro frontend is running at http://localhost:3000"
+    if curl -f http://localhost:3004 > /dev/null 2>&1; then
+        echo "✅ Astro frontend is running at http://localhost:3004"
     else
         echo "❌ Astro frontend is not responding"
     fi
@@ -133,8 +133,8 @@ else
     fi
     
     # Check Astro frontend
-    if curl -f http://localhost:3000 > /dev/null 2>&1; then
-        echo "✅ Astro frontend is running at http://localhost:3000"
+    if curl -f http://localhost:3004 > /dev/null 2>&1; then
+        echo "✅ Astro frontend is running at http://localhost:3004"
     else
         echo "❌ Astro frontend is not responding"
     fi
@@ -158,10 +158,10 @@ echo ""
 if [ "$FRONTEND_ONLY" = true ]; then
     echo "🎉 WPlace Frontend is ready!"
     echo "======================================"
-    echo "📊 Dashboard: http://localhost:3000"
+    echo "📊 Dashboard: http://localhost:3004"
     echo ""
     echo "📋 Next steps:"
-    echo "1. Open your browser and go to http://localhost:3000"
+    echo "1. Open your browser and go to http://localhost:3004"
     echo "2. Navigate to https://wplace.live in another tab"
     echo "3. Inject the Auto-Slave.js script using one of these methods:"
     echo "   - Browser extension (recommended)"
@@ -173,12 +173,12 @@ if [ "$FRONTEND_ONLY" = true ]; then
 else
     echo "🎉 WPlace Master System is ready!"
     echo "======================================"
-    echo "📊 Dashboard: http://localhost:3000"
+    echo "📊 Dashboard: http://localhost:3004"
     echo "🔧 API Docs:  http://localhost:8008/docs"
     echo "📝 API Health: http://localhost:8008/health"
     echo ""
     echo "📋 Next steps:"
-    echo "1. Open your browser and go to http://localhost:3000"
+    echo "1. Open your browser and go to http://localhost:3004"
     echo "2. Navigate to https://wplace.live in another tab"
     echo "3. Inject the Auto-Slave.js script using one of these methods:"
     echo "   - Browser extension (recommended)"

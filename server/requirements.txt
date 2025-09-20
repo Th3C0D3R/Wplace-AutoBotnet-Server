@@ -8,6 +8,6 @@ python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 python-dotenv==1.0.0
 redis==5.0.1
-# psycopg2-binary==2.9.9  # disabled for local dev on macOS due to pg_config missing; DB not required now
+psycopg2-binary==2.9.9
 sqlalchemy==2.0.23
 alembic==1.13.1

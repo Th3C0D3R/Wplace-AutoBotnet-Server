@@ -510,6 +510,45 @@ def setup_endpoints(app):
             
         return {"session_id": session_id, "session": session}
     
+    @app.post("/api/sessions/{session_id}/update-slaves")
+    async def update_session_slaves(session_id: str, update: SelectedSlavesUpdate):
+        """Actualizar slaves en una sesión existente."""
+        if session_id not in active_sessions:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        # Actualizar slaves en memoria
+        active_sessions[session_id].slave_ids = update.slave_ids
+        
+        # Actualizar en DB
+        db = SessionLocal()
+        try:
+            s = db.query(SessionModel).filter(SessionModel.id == session_id).first()
+            if s:
+                s.slave_ids = update.slave_ids
+                s.updated_at = datetime.utcnow()
+                db.commit()
+        except SQLAlchemyError as e:
+            logger.error(f"DB update session slaves error: {e}")
+            db.rollback()
+        finally:
+            db.close()
+        
+        # Si la sesión está corriendo, configurar nuevos slaves
+        session = active_sessions[session_id]
+        project = active_projects.get(session.project_id)
+        
+        if project:
+            # Configurar todos los slaves con el proyecto actual
+            for slave_id in update.slave_ids:
+                if slave_id in connected_slaves:
+                    try:
+                        await manager.send_to_slave(slave_id, {"type": "setMode", "mode": project.mode})
+                        await manager.send_to_slave(slave_id, {"type": "loadProject", "config": project.config})
+                    except Exception as e:
+                        logger.error(f"Error configuring slave {slave_id}: {e}")
+        
+        return {"ok": True, "session_id": session_id, "slave_ids": update.slave_ids}
+    
     # === Health check ===
     
     @app.get("/health")
@@ -616,6 +655,28 @@ async def _handle_telemetry_message(slave_id: str, message: Dict[str, Any]):
     # Fusionar con telemetría existente
     existing = connected_slaves[slave_id].telemetry if isinstance(connected_slaves[slave_id].telemetry, dict) else {}
     
+    # Si llega preview_data, asegurar que tenga área (fallback desde último guard upload)
+    if 'preview_data' in telem:
+        try:
+            pd = telem.get('preview_data') or {}
+            if isinstance(pd, dict):
+                area = (
+                    pd.get('protectedArea') or
+                    pd.get('area') or
+                    (last_guard_upload and isinstance(last_guard_upload.get('data'), dict) and (
+                        (last_guard_upload['data'].get('protectionData') or {}).get('area') or
+                        last_guard_upload['data'].get('protectionArea')
+                    ))
+                )
+                if area and not (pd.get('protectedArea') or pd.get('area')):
+                    pd['protectedArea'] = area
+                # Normalizar nombres alternativos por si llegan en snake_case
+                if not pd.get('protectedArea') and isinstance(pd.get('protected_area'), dict):
+                    pd['protectedArea'] = pd.get('protected_area')
+                telem['preview_data'] = pd
+        except Exception:
+            pass
+    
     def _changes_are_detailed(changes):
         try:
             return (isinstance(changes, list) and len(changes) > 0 and 
@@ -663,6 +724,24 @@ async def _handle_preview_data_message(slave_id: str, message: Dict[str, Any]):
     """Manejar mensaje de preview_data del favorito."""
     if connected_slaves[slave_id].is_favorite:
         preview_payload = message.get("data", {})
+        
+        # Asegurar que la preview tenga área (fallback a último guard upload)
+        try:
+            if isinstance(preview_payload, dict):
+                area = (
+                    preview_payload.get('protectedArea') or
+                    preview_payload.get('area') or
+                    (last_guard_upload and isinstance(last_guard_upload.get('data'), dict) and (
+                        (last_guard_upload['data'].get('protectionData') or {}).get('area') or
+                        last_guard_upload['data'].get('protectionArea')
+                    ))
+                )
+                if area and not (preview_payload.get('protectedArea') or preview_payload.get('area')):
+                    preview_payload['protectedArea'] = area
+                if not preview_payload.get('protectedArea') and isinstance(preview_payload.get('protected_area'), dict):
+                    preview_payload['protectedArea'] = preview_payload.get('protected_area')
+        except Exception:
+            pass
         
         # Envejecer bloqueos
         try:
@@ -876,4 +955,4 @@ async def _send_initial_ui_state(websocket: WebSocket):
         "sessions": sessions_list,
         "selected_slaves": list(ui_selected_slaves),
         "available_colors": initial_available_colors
-    }))
+    }, default=str))

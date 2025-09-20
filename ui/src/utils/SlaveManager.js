@@ -42,9 +42,11 @@ export class SlaveManager {
     }
 
     const preselected = (id) => {
+      // Si hay selección local o del servidor, respetarla
       if (this._selectedSlavesLocal && this._selectedSlavesLocal.size > 0) return this._selectedSlavesLocal.has(id);
       if (this._selectedSlavesServer && this._selectedSlavesServer.size > 0) return this._selectedSlavesServer.has(id);
-      return false;
+      // Por defecto, activar automáticamente nuevos slaves
+      return true;
     };
 
     const allSlaves = Array.from(this.slaves.values());

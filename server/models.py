@@ -7,7 +7,7 @@ persistencia en base de datos.
 Funcionalidades:
 - Modelos Pydantic para validación de requests/responses
 - Modelos SQLAlchemy para persistencia en base de datos
-- Configuración de base de datos SQLite
+- Configuración de base de datos configurable por entorno (PostgreSQL por defecto via env)
 - Inicialización automática de esquemas
 """
 
@@ -18,6 +18,7 @@ from sqlalchemy import create_engine, Column, String, DateTime, JSON, Text
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.exc import SQLAlchemyError
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -95,9 +96,16 @@ class GuardRepairRequest(BaseModel):
 
 # === Modelos SQLAlchemy para Base de Datos ===
 
-# Configuración de base de datos
-DATABASE_URL = "sqlite:///./master.db"
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+# Configuración de base de datos: usar env DATABASE_URL si existe (compose la define para Postgres)
+DEFAULT_SQLITE_URL = "sqlite:///./master.db"
+DATABASE_URL = os.getenv("DATABASE_URL", DEFAULT_SQLITE_URL)
+
+# Ajustes específicos según el driver
+engine_kwargs = {}
+if DATABASE_URL.startswith("sqlite"):
+    engine_kwargs["connect_args"] = {"check_same_thread": False}
+
+engine = create_engine(DATABASE_URL, **engine_kwargs)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -130,7 +138,7 @@ def init_db():
     """Inicializar la base de datos creando todas las tablas."""
     try:
         Base.metadata.create_all(bind=engine)
-        logger.info("DB initialized (SQLite)")
+        logger.info(f"DB initialized ({'SQLite' if DATABASE_URL.startswith('sqlite') else 'SQL'})")
     except SQLAlchemyError as e:
         logger.error(f"DB init error: {e}")
 

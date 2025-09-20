@@ -487,7 +487,7 @@ import { UIHelpers } from '/utils/UIHelpers.js';
             }
           } catch {}
           
-          this.previewManager.updatePreviewFromSlave(fav.id, fav.telemetry.preview_data);
+          this.previewManager.updatePreviewFromSlave(message.slave_id, message.data);
           this.previewManager.renderGuardPreviewCanvas(fav.telemetry.preview_data);
           
           try {
@@ -538,6 +538,13 @@ import { UIHelpers } from '/utils/UIHelpers.js';
             try {
               this.updateControlButtons();
             } catch {}
+          } else if (projects.length > 0) {
+            // Si no hay sesiones pero sí proyectos, cargar el primer proyecto disponible
+            this.log(`♻️ No sessions found, but ${projects.length} projects available. Loading first project.`);
+            const proj = projects[0];
+            if (proj) {
+              this.handleProjectRehydration(proj);
+            }
           }
         }
 
@@ -575,6 +582,13 @@ import { UIHelpers } from '/utils/UIHelpers.js';
               this.previewManager.requestPreviewRefreshThrottle();
             }
           } catch {}
+          
+          // Actualizar botones de control después de rehidratar el proyecto
+          try {
+            this.updateControlButtons();
+          } catch {}
+          
+          this.log(`♻️ Project rehydrated: mode=${this.detectedBotMode}, config=${!!this.projectConfig}`);
         }
 
         /**
@@ -628,7 +642,79 @@ import { UIHelpers } from '/utils/UIHelpers.js';
           this.log(`🤖 Slave ${message.type === 'slave_reconnected' ? 'reconnected' : 'connected'}: ${message.slave_id}`);
           setTimeout(() => {
             this.slaveManager.refreshSlaves();
+            // Auto-activar el nuevo slave y persistir la selección
+            setTimeout(() => {
+              this._autoActivateNewSlave(message.slave_id);
+            }, 200);
           }, 100);
+        }
+
+        /**
+         * Auto-activa un nuevo slave y persiste la selección
+         */
+        async _autoActivateNewSlave(slaveId) {
+          try {
+            const checkbox = document.getElementById(`slave-toggle-${slaveId}`);
+            if (checkbox && !checkbox.checked) {
+              checkbox.checked = true;
+              this.updateToggleState(checkbox.id, true);
+              
+              // Persistir selección localmente y en servidor
+              const selected = Array.from(document.querySelectorAll('.slave-toggle:checked')).map(cb => cb.value);
+              localStorage.setItem('selectedSlaves', JSON.stringify(selected));
+              
+              await fetch(`${this.apiBase()}/api/ui/selected-slaves`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ slave_ids: selected })
+              }).catch(() => {});
+              
+              // Si hay una sesión activa, asignar lotes al nuevo slave
+              if (this.sessionManager.sessionStatus === 'running') {
+                await this._assignBatchesToNewSlave(slaveId);
+              }
+              
+              this.updateControlButtons();
+              this.recomputeRoundPlan();
+              
+              this.log(`✅ Auto-activated slave: ${slaveId}`);
+            }
+          } catch (error) {
+            console.error('Error auto-activating slave:', error);
+          }
+        }
+
+        /**
+         * Asigna lotes a un nuevo slave durante una sesión activa
+         */
+        async _assignBatchesToNewSlave(slaveId) {
+          try {
+            // Obtener información del proyecto actual
+            if (!this.detectedBotMode || !this.projectConfig) {
+              this.log(`⚠️ No project loaded, cannot assign batches to new slave ${slaveId}`);
+              return;
+            }
+            
+            // Actualizar la sesión para incluir el nuevo slave
+            if (this.sessionManager.currentSession) {
+              const currentSelectedSlaves = Array.from(document.querySelectorAll('.slave-toggle:checked')).map(cb => cb.value);
+              
+              // Actualizar slaves en la sesión existente
+              const updateResponse = await fetch(`${this.apiBase()}/api/sessions/${this.sessionManager.currentSession}/update-slaves`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ slave_ids: currentSelectedSlaves })
+              });
+              
+              if (updateResponse.ok) {
+                this.log(`🎯 Updated session with new slave ${slaveId} - batches will be assigned automatically`);
+              } else {
+                this.log(`⚠️ Failed to update session with new slave ${slaveId}`);
+              }
+            }
+          } catch (error) {
+            this.log(`❌ Error assigning batches to new slave ${slaveId}: ${error}`);
+          }
         }
 
         /**
