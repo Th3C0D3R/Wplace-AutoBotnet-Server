@@ -6,6 +6,8 @@ import ConfigPanel from "../components/ConfigPanel.astro";
 import ControlPanel from "../components/ControlPanel.astro";
 import TelemetryPanel from "../components/TelemetryPanel.astro";
 import PreviewPanel from "../components/PreviewPanel.astro";
+import ProjectsList from "../components/ProjectsList.astro";
+// Nota: ProjectsListManager vive en /public para importación en el navegador
 ---
 
 <html lang="en">
@@ -118,6 +120,7 @@ import PreviewPanel from "../components/PreviewPanel.astro";
             <ControlPanel />
             <TelemetryPanel />
             <PreviewPanel />
+            <ProjectsList />
           </div>
         </div>
       </main>
@@ -132,6 +135,7 @@ import { PreviewManager } from '/utils/PreviewManager.js';
 import { SessionManager } from '/utils/SessionManager.js';
 import { ConfigManager } from '/utils/ConfigManager.js';
 import { UIHelpers } from '/utils/UIHelpers.js';
+      import { ProjectsListManager } from '/utils/ProjectsListManager.js';
 
       /**
        * Clase principal del Dashboard WPlace - Refactorizada y modularizada
@@ -156,6 +160,7 @@ import { UIHelpers } from '/utils/UIHelpers.js';
           this.previewManager = new PreviewManager(this);
           this.sessionManager = new SessionManager(this);
           this.configManager = new ConfigManager(this);
+          this.projectsListManager = new ProjectsListManager(this);
           
           // Inicializar la aplicación
           this.init();
@@ -366,6 +371,12 @@ import { UIHelpers } from '/utils/UIHelpers.js';
             case 'guard_upload_sent':
               this.handleGuardUploadSent(message);
               break;
+            case 'project_created':
+              this.upsertProjectInList(message.project);
+              break;
+            case 'project_deleted':
+              this.removeProjectFromList(message.project_id);
+              break;
             case 'log':
               this.log(`[${message.slave_id}] ${message.message}`);
               break;
@@ -450,10 +461,41 @@ import { UIHelpers } from '/utils/UIHelpers.js';
             
             // Rehidratar sesión/proyecto si existen en servidor
             this.handleSessionRehydration(message);
+
+            // Renderizar lista de proyectos existentes
+            try {
+              const projects = Array.isArray(message.projects) ? message.projects : [];
+              this.renderProjectsList(projects);
+            } catch {}
             
             // Autoasignar favorito si es necesario
             this.autoAssignFavoriteIfNeeded();
             
+            // Si no hay proyecto rehidratado, intentar recuperar último guard upload del servidor
+            try {
+              const noProjects = !Array.isArray(message.projects) || message.projects.length === 0;
+              if (noProjects && !this.projectConfig) {
+                fetch(`${this.apiBase()}/api/guard/last-upload`).then(r => r.ok ? r.json() : null).then(js => {
+                  if (js && js.ok && js.data) {
+                    this.projectConfig = js.data;
+                    this.detectedBotMode = 'Guard';
+                    const detectedEl = document.getElementById('detected-mode');
+                    if (detectedEl) detectedEl.textContent = `Detected mode: ${this.detectedBotMode}`;
+                    const statusEl = document.getElementById('file-status');
+                    if (statusEl) statusEl.textContent = `Loaded from server: ${js.filename || 'guard.json'}`;
+                    const panel = document.getElementById('preview-panel');
+                    if (panel) panel.style.display = 'block';
+                    try {
+                      // Forzar un refresh de preview para rellenar lastPreviewData
+                      this.previewManager.requestPreviewRefreshThrottle();
+                    } catch {}
+                    this.updateControlButtons();
+                    this.log('♻️ Project rehydrated from last guard upload');
+                  }
+                }).catch(() => {});
+              }
+            } catch {}
+
             // Pedir refresh para reanudar flujo de preview tras recarga
             try {
               this.previewManager.requestPreviewRefreshThrottle();
@@ -487,8 +529,13 @@ import { UIHelpers } from '/utils/UIHelpers.js';
             }
           } catch {}
           
-          this.previewManager.updatePreviewFromSlave(message.slave_id, message.data);
-          this.previewManager.renderGuardPreviewCanvas(fav.telemetry.preview_data);
+          try {
+            const pd = fav?.telemetry?.preview_data;
+            if (pd) {
+              this.previewManager.updatePreviewFromSlave(fav.id, pd);
+              this.previewManager.renderGuardPreviewCanvas(pd);
+            }
+          } catch {}
           
           try {
             this.updateControlButtons();
@@ -589,6 +636,17 @@ import { UIHelpers } from '/utils/UIHelpers.js';
           } catch {}
           
           this.log(`♻️ Project rehydrated: mode=${this.detectedBotMode}, config=${!!this.projectConfig}`);
+        }
+
+        // ======== Gestión de lista de proyectos ========
+        renderProjectsList(projects) {
+          try { this.projectsListManager.render(projects || []); } catch {}
+        }
+        upsertProjectInList(project) {
+          try { this.projectsListManager.upsert(project); } catch {}
+        }
+        removeProjectFromList(projectId) {
+          try { this.projectsListManager.remove(projectId); } catch {}
         }
 
         /**

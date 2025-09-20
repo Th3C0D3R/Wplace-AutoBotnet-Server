@@ -318,6 +318,27 @@ def setup_endpoints(app):
         
         return {"ok": True, "cleared_slaves": cleared_slaves, "total_cleared": len(cleared_slaves)}
     
+    @app.get("/api/guard/last-upload")
+    async def guard_get_last_upload():
+        """Obtener el último guardData subido (para rehidratación tras recarga de UI).
+
+        Respuestas:
+        - 200 con { filename, data, stored_at } si existe
+        - 404 si no hay ningún upload registrado en memoria
+        """
+        if not last_guard_upload:
+            raise HTTPException(status_code=404, detail="No guard upload available")
+        try:
+            return {
+                "ok": True,
+                "filename": last_guard_upload.get("filename"),
+                "data": last_guard_upload.get("data"),
+                "stored_at": last_guard_upload.get("stored_at")
+            }
+        except Exception:
+            # Fallback defensivo
+            return {"ok": True, **(last_guard_upload or {})}
+
     @app.get("/api/guard/preview")
     async def guard_get_preview():
         """Obtener último preview_data del slave favorito."""
@@ -333,54 +354,118 @@ def setup_endpoints(app):
         return {"ok": True, "slave_id": fav_id, "data": pdata}
     
     @app.post("/api/guard/upload")
-    async def upload_guard(guard: GuardUpload):
-        """Subir configuración Guard y enviar al slave favorito."""
+    async def upload_guard(guard: GuardUpload, persist: bool = True):
+        """Subir configuración Guard y enviar al slave favorito.
+
+        Query params:
+        - persist: si False, no crea un nuevo proyecto ni emite project_created (para activar un proyecto existente)
+        """
         # Localizar slave favorito
         fav_id = None
         for sid, sinfo in connected_slaves.items():
             if getattr(sinfo, 'is_favorite', False):
                 fav_id = sid
                 break
-                
         if not fav_id:
             raise HTTPException(status_code=400, detail="No favorite slave connected")
-        
-        # Empaquetar datos
+
+        logger.info(
+            f"[GUARD UPLOAD] Enviando guardData a slave favorito {fav_id} (pixels={len(guard.data.get('originalPixels', []))})"
+        )
+
+        # Empaquetar datos a enviar al favorito
         payload = {
             "type": "guardData",
             "filename": guard.filename or "uploaded_guard.json",
             "guardData": guard.data,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().isoformat(),
         }
-        
-        logger.info(f"[GUARD UPLOAD] Enviando guardData a slave favorito {fav_id} (pixels={len(guard.data.get('originalPixels', []))})")
-        
-        # Persistir último guardData
+
+        # Persistir último guardData (para rehidratación)
         global last_guard_upload
         last_guard_upload = {
             "filename": guard.filename or "uploaded_guard.json",
             "data": guard.data,
-            "stored_at": datetime.utcnow().isoformat()
+            "stored_at": datetime.utcnow().isoformat(),
         }
+
+        project_id = None
+        if persist:
+            # Persistir como proyecto (para rehidratación visible en UI)
+            project_id = str(uuid.uuid4())
+            try:
+                active_projects[project_id] = ProjectConfig(
+                    name=guard.filename or "Guard Upload", mode="Guard", config=guard.data
+                )
+            except Exception:
+                active_projects[project_id] = ProjectConfig(name="Guard Upload", mode="Guard", config=guard.data)
+            db = SessionLocal()
+            try:
+                db.add(
+                    ProjectModel(
+                        id=project_id,
+                        name=active_projects[project_id].name,
+                        mode="Guard",
+                        config=guard.data,
+                    )
+                )
+                db.commit()
+            except SQLAlchemyError as e:
+                logger.error(f"DB save guard-upload project error: {e}")
+                db.rollback()
+            finally:
+                db.close()
+
+            # Notificar a UIs que se creó un proyecto
+            try:
+                await manager.broadcast_to_ui(
+                    {
+                        "type": "project_created",
+                        "project": {
+                            "id": project_id,
+                            "name": active_projects[project_id].name,
+                            "mode": "Guard",
+                            "config": guard.data,
+                        },
+                    }
+                )
+            except Exception:
+                pass
+
+        # Limpiar preview_data previo en servidor (para evitar que persista el anterior)
+        try:
+            for sid, sinfo in connected_slaves.items():
+                if isinstance(sinfo.telemetry, dict):
+                    sinfo.telemetry.pop('preview_data', None)
+        except Exception as e:
+            logger.warning(f"[GUARD UPLOAD] Failed clearing previous preview_data: {e}")
+
+        # Pedir al favorito limpiar su estado antes de cargar nuevo guard
+        try:
+            await manager.send_to_slave(fav_id, {"type": "guardControl", "action": "clear"})
+        except Exception as e:
+            logger.warning(f"[GUARD UPLOAD] Failed sending clear to favorite {fav_id}: {e}")
 
         # Usar función con metadatos para obtener información de compresión
         compressed_json, compression_metadata = _compress_with_metadata(payload)
-        
+
         # Enviar al slave
         await manager.slave_connections[fav_id].send_text(compressed_json)
-        
+
         # Notificar a UI con información de compresión
-        await manager.broadcast_to_ui({
-            "type": "guard_upload_sent",
-            "slave_id": fav_id,
-            "filename": payload["filename"],
-            "pixels": len(guard.data.get('originalPixels', [])),
-            "originalLength": compression_metadata['originalLength'],
-            "compressedLength": compression_metadata['compressedLength'],
-            "compressed": compression_metadata['compressed']
-        })
-        
-        return {"ok": True, "sent_to": fav_id, "filename": payload["filename"]}
+        await manager.broadcast_to_ui(
+            {
+                "type": "guard_upload_sent",
+                "slave_id": fav_id,
+                "filename": payload["filename"],
+                "pixels": len(guard.data.get("originalPixels", [])),
+                "originalLength": compression_metadata["originalLength"],
+                "compressedLength": compression_metadata["compressedLength"],
+                "compressed": compression_metadata["compressed"],
+            }
+        )
+
+        return {"ok": True, "sent_to": fav_id, "filename": payload["filename"], "project_id": project_id, "persisted": bool(project_id)}
     
     # === Endpoints de UI ===
     
@@ -430,6 +515,20 @@ def setup_endpoints(app):
         finally:
             db.close()
             
+        # Notificar a UIs
+        try:
+            await manager.broadcast_to_ui({
+                "type": "project_created",
+                "project": {
+                    "id": project_id,
+                    "name": project.name,
+                    "mode": project.mode,
+                    "config": project.config,
+                },
+            })
+        except Exception:
+            pass
+
         return {"project_id": project_id, "project": project}
     
     @app.get("/api/projects/{project_id}")
@@ -438,6 +537,50 @@ def setup_endpoints(app):
         if project_id not in active_projects:
             raise HTTPException(status_code=404, detail="Project not found")
         return active_projects[project_id]
+
+    @app.delete("/api/projects/{project_id}")
+    async def delete_project(project_id: str):
+        """Eliminar un proyecto y sus sesiones asociadas."""
+        # Eliminar de memoria
+        removed = bool(active_projects.pop(project_id, None))
+
+        # Eliminar sesiones asociadas en memoria
+        try:
+            to_delete = [sid for sid, s in active_sessions.items() if s.project_id == project_id]
+            for sid in to_delete:
+                active_sessions.pop(sid, None)
+        except Exception:
+            pass
+
+        # Eliminar en DB
+        db = SessionLocal()
+        try:
+            # Borrar sesiones primero
+            try:
+                db.query(SessionModel).filter(SessionModel.project_id == project_id).delete()
+            except Exception:
+                pass
+            # Borrar proyecto
+            proj = db.query(ProjectModel).filter(ProjectModel.id == project_id).first()
+            if proj:
+                db.delete(proj)
+            db.commit()
+        except SQLAlchemyError as e:
+            logger.error(f"DB delete project error: {e}")
+            db.rollback()
+        finally:
+            db.close()
+
+        # Notificar a UIs
+        try:
+            await manager.broadcast_to_ui({"type": "project_deleted", "project_id": project_id})
+        except Exception:
+            pass
+
+        if not removed:
+            # Si no estaba en memoria, igualmente devolvemos ok pues se eliminó en DB si existía
+            return {"ok": True, "project_id": project_id, "existed": False}
+        return {"ok": True, "project_id": project_id, "existed": True}
     
     @app.post("/api/projects/clear-all")
     async def clear_all_projects_and_sessions():
