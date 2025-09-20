@@ -737,11 +737,23 @@ async def _handle_repair_error_message(slave_id: str, message: Dict[str, Any]):
 
 async def _handle_paint_progress_message(slave_id: str, message: Dict[str, Any]):
     """Manejar progreso de pintado."""
+    # Asegurar que completed y total tengan valores válidos
+    completed = message.get('completed', 0)
+    total = message.get('total', 0)
+    
+    # Si no hay valores válidos, usar batchSize como fallback
+    if completed is None or total is None:
+        batch_size = message.get('batchSize', 1)
+        completed = completed if completed is not None else 0
+        total = total if total is not None else batch_size
+    
     await manager.broadcast_to_ui({
         "type": "paint_progress",
         "slave_id": slave_id,
         "is_favorite": bool(connected_slaves[slave_id].is_favorite),
-        **{k: v for k, v in message.items() if k != 'type'}
+        "completed": completed,
+        "total": total,
+        **{k: v for k, v in message.items() if k not in ['type', 'completed', 'total']}
     })
 
 

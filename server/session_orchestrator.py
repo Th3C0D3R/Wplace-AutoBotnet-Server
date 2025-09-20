@@ -255,6 +255,7 @@ def setup_session_endpoints(app):
                         
                         # 4. Planificación con estrategias
                         pixels_per_batch = int(guard_config.get('pixelsPerBatch') or 10)
+                        min_charges_to_wait = int(guard_config.get('minChargesToWait') or 20)
                         spend_all = bool(guard_config.get('spendAllPixelsOnStart'))
                         strategy = str(guard_config.get('chargeStrategy', 'greedy')).lower()
 
@@ -264,9 +265,9 @@ def setup_session_endpoints(app):
                             await asyncio.sleep(5)
                             continue
 
-                        # Esperar si no alcanzamos el lote deseado y no es spend_all
-                        if not spend_all and sum_charges < pixels_per_batch:
-                            logger.info(f"[planner] Waiting for charges: need {pixels_per_batch} have {sum_charges}")
+                        # Esperar si no alcanzamos las cargas mínimas y no es spend_all
+                        if not spend_all and sum_charges < min_charges_to_wait:
+                            logger.info(f"[planner] Waiting for minimum charges: need {min_charges_to_wait} have {sum_charges}")
                             await asyncio.sleep(10)
                             continue
 
@@ -572,7 +573,12 @@ def setup_session_endpoints(app):
         
         # Planificación una sola ronda
         pixels_per_batch = int(guard_config.get('pixelsPerBatch') or 10)
+        min_charges_to_wait = int(guard_config.get('minChargesToWait') or 20)
         spend_all = bool(guard_config.get('spendAllPixelsOnStart'))
+        
+        # Verificar cargas mínimas si no es spend_all
+        if not spend_all and total_remaining < min_charges_to_wait:
+            return {"ok": True, "session_id": session_id, "assigned": 0, "reason": "insufficient_charges", "total_remaining": total_remaining, "min_required": min_charges_to_wait}
         round_total = sum(charges.values()) if spend_all else min(sum(charges.values()), pixels_per_batch)
         if round_total <= 0:
             return {"ok": True, "session_id": session_id, "assigned": 0, "reason": "zero_round_total", "total_remaining": total_remaining}
