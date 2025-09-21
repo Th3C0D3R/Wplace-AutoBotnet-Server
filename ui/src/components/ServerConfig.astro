@@ -120,22 +120,22 @@
   import serverConfigManager from '../utils/ServerConfigManager.js';
 
   document.addEventListener('DOMContentLoaded', () => {
-    const serverUrlInput = document.getElementById('server-url');
-    const urlValidation = document.getElementById('url-validation');
-    const connectionIndicator = document.getElementById('connection-indicator');
-    const connectionStatus = document.getElementById('connection-status');
-    const connectionIndicatorHeader = document.getElementById('connection-indicator-header');
-    const connectionStatusHeader = document.getElementById('connection-status-header');
-    const testConnectionBtn = document.getElementById('test-connection-btn');
-    const reconnectBtn = document.getElementById('reconnect-btn');
-    const autoConnectCheckbox = document.getElementById('auto-connect');
-    const reconnectAttemptsInput = document.getElementById('reconnect-attempts');
-    const reconnectDelayInput = document.getElementById('reconnect-delay');
+    const serverUrlInput = document.getElementById('server-url') as HTMLInputElement;
+    const urlValidation = document.getElementById('url-validation') as HTMLElement;
+    const connectionIndicator = document.getElementById('connection-indicator') as HTMLElement;
+    const connectionStatus = document.getElementById('connection-status') as HTMLElement;
+    const connectionIndicatorHeader = document.getElementById('connection-indicator-header') as HTMLElement;
+    const connectionStatusHeader = document.getElementById('connection-status-header') as HTMLElement;
+    const testConnectionBtn = document.getElementById('test-connection-btn') as HTMLButtonElement;
+    const reconnectBtn = document.getElementById('reconnect-btn') as HTMLButtonElement;
+    const autoConnectCheckbox = document.getElementById('auto-connect') as HTMLInputElement;
+    const reconnectAttemptsInput = document.getElementById('reconnect-attempts') as HTMLInputElement;
+    const reconnectDelayInput = document.getElementById('reconnect-delay') as HTMLInputElement;
     
     // Elementos para el comportamiento de colapso
-    const header = document.getElementById('server-config-header');
-    const content = document.getElementById('server-config-content');
-    const expandIcon = document.getElementById('expand-icon');
+    const header = document.getElementById('server-config-header') as HTMLElement;
+    const content = document.getElementById('server-config-content') as HTMLElement;
+    const expandIcon = document.getElementById('expand-icon') as HTMLElement;
     
     let isExpanded = true; // Por defecto expandido
     let isConnected = false; // Estado de conexión
