@@ -16,6 +16,27 @@ export class SlaveManager {
     this._selectedSlavesLocal = new Set();
     this._selectedSlavesServer = new Set();
     this._flashTimers = new Map();
+    
+    // Cargar estado persistido desde localStorage
+    this.loadPersistedSlaveSelection();
+  }
+
+  /**
+   * Carga la selección de slaves desde localStorage
+   */
+  loadPersistedSlaveSelection() {
+    try {
+      const stored = localStorage.getItem('selectedSlaves');
+      if (stored) {
+        const slaveIds = JSON.parse(stored);
+        if (Array.isArray(slaveIds)) {
+          this._selectedSlavesLocal = new Set(slaveIds);
+        }
+      }
+    } catch (error) {
+      console.warn('Error loading persisted slave selection:', error);
+      this._selectedSlavesLocal = new Set();
+    }
   }
 
   /**
@@ -42,11 +63,9 @@ export class SlaveManager {
     }
 
     const preselected = (id) => {
-      // Si hay selección local o del servidor, respetarla
       if (this._selectedSlavesLocal && this._selectedSlavesLocal.size > 0) return this._selectedSlavesLocal.has(id);
       if (this._selectedSlavesServer && this._selectedSlavesServer.size > 0) return this._selectedSlavesServer.has(id);
-      // Por defecto, activar automáticamente nuevos slaves
-      return true;
+      return false;
     };
 
     const allSlaves = Array.from(this.slaves.values());

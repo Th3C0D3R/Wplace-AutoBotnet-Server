@@ -1,38 +1,36 @@
----
-// Project Preview section with statistics, visualization toggles, zoom and canvas
----
+<!-- PreviewPanel: sección de previsualización con estadísticas, controles de visualización, zoom y canvas -->
 
-<div id="preview-panel" class="bg-card border rounded-lg p-0 mt-6 w-full" style="display: none;">
+<div id="preview-panel" class="panel preview-panel" style="display: none;">
   <!-- Header -->
-  <div class="flex items-center justify-start p-4 bg-slate-800 rounded-t-lg border-b border-slate-600 select-none">
-    <h2 class="text-lg font-semibold text-card-foreground flex items-center gap-2">
+  <div class="panel__header panel__header--dark">
+    <h2 class="text-heading" style="overflow: visible; white-space: nowrap; text-overflow: ellipsis;">
       🔍 <span>Project Preview</span>
     </h2>
   </div>
   
   <!-- Main content -->
-  <div class="flex w-full" id="preview-content">
+  <div class="preview-content" id="preview-content">
     <!-- Left panel - Controls (minimized) -->
-    <div class="w-64 bg-slate-800 p-4 border-r border-slate-600 overflow-y-auto flex-shrink-0">
+    <div class="preview-sidebar">
       <!-- Visualization Controls -->
-      <div class="bg-slate-700 rounded-lg p-3 mb-4">
-        <h3 class="text-sm font-semibold text-blue-400 mb-2">🎨 Visualización</h3>
+      <div class="card card--dark">
+        <h3 class="text-body text-medium text-primary">🎨 Visualización</h3>
         <div id="guard-preview-controls"></div>
       </div>
 
       <!-- Zoom Controls -->
-      <div class="bg-slate-700 rounded-lg p-3">
-        <h3 class="text-sm font-semibold text-blue-400 mb-2">🔍 Zoom</h3>
-        <div class="space-y-2">
-          <div class="flex items-center justify-between text-xs">
-            <span>-</span>
-            <input type="range" id="zoom-slider" min="0.5" max="5" step="0.1" value="1" class="flex-1 mx-2">
-            <span>+</span>
+      <div class="card card--dark">
+        <h3 class="text-body text-medium text-primary">🔍 Zoom</h3>
+        <div class="zoom-controls">
+          <div class="zoom-slider-container">
+            <span class="zoom-indicator">-</span>
+            <input type="range" id="zoom-slider" min="0.5" max="5" step="0.1" value="1" class="zoom-slider">
+            <span class="zoom-indicator">+</span>
           </div>
-          <div class="text-center text-xs text-gray-400">
+          <div class="zoom-level">
             <span id="zoom-level">100%</span>
           </div>
-          <button id="fit-zoom" class="w-full px-2 py-1 text-xs bg-green-600 hover:bg-green-700 text-white rounded">
+          <button id="fit-zoom" class="btn btn--primary btn--small">
             📐 Ajustar Zoom
           </button>
         </div>
@@ -40,12 +38,148 @@
     </div>
     
     <!-- Right panel - Canvas (maximized) -->
-    <div class="flex-1 bg-slate-900 relative">
-      <div class="w-full h-full overflow-auto p-2 md:p-3" id="canvas-container">
-        <canvas id="preview-canvas" class="border border-slate-600" style="display:block;margin:0 auto;"></canvas>
+    <div class="preview-canvas-area">
+      <div class="canvas-container" id="canvas-container">
+        <canvas id="preview-canvas" class="preview-canvas"></canvas>
       </div>
     </div>
   </div>
   <!-- Resize handle -->
-  <div id="preview-resizer" class="h-3 bg-slate-800/70 hover:bg-slate-700 border-t border-slate-600 cursor-ns-resize rounded-b-lg"></div>
+  <div id="preview-resizer" class="preview-resizer"></div>
 </div>
+
+<!-- Styles específicos para PreviewPanel -->
+<style>
+  .preview-panel {
+    padding: 0;
+    overflow: hidden;
+  }
+  
+  .panel__header--dark {
+    background-color: hsl(var(--card-dark));
+    border-bottom: 1px solid hsl(var(--border));
+    padding: var(--space-4);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  /* Evita truncado por márgenes negativos globales de .panel__header */
+  .preview-panel .panel__header {
+    margin: 0 0 var(--space-4) 0;
+    border-top-left-radius: var(--radius-lg);
+    border-top-right-radius: var(--radius-lg);
+  }
+  
+  .preview-content {
+    display: flex;
+    width: 100%;
+    height: 600px;
+  }
+  
+  .preview-sidebar {
+    width: 256px;
+    background-color: hsl(var(--card-dark));
+    padding: var(--space-4);
+    border-right: 1px solid hsl(var(--border));
+    overflow-y: auto;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+  
+  .card--dark {
+    background-color: hsl(218 15% 25%);
+    border: 1px solid hsl(var(--border));
+  }
+  
+  .zoom-controls {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  
+  .zoom-slider-container {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  
+  .zoom-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    background: hsl(var(--border));
+    border-radius: 2px;
+    outline: none;
+  }
+  
+  .zoom-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    background: hsl(var(--primary));
+    border-radius: 50%;
+    cursor: pointer;
+  }
+  
+  .zoom-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    background: hsl(var(--primary));
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+  }
+  
+  .zoom-indicator {
+    color: hsl(var(--muted-foreground));
+    font-size: var(--text-xs);
+    user-select: none;
+  }
+  
+  .zoom-level {
+    text-align: center;
+    color: hsl(var(--muted-foreground));
+    font-size: var(--text-xs);
+  }
+  
+  .preview-canvas-area {
+    flex: 1;
+    background-color: hsl(220 15% 15%);
+    position: relative;
+  }
+  
+  .canvas-container {
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    padding: var(--space-2);
+  }
+  
+  @media (min-width: 768px) {
+    .canvas-container {
+      padding: var(--space-3);
+    }
+  }
+  
+  .preview-canvas {
+    border: 1px solid hsl(var(--border));
+    display: block;
+    margin: 0 auto;
+  }
+  
+  .preview-resizer {
+    height: 12px;
+    background-color: hsl(var(--card-dark) / 0.7);
+    border-top: 1px solid hsl(var(--border));
+    cursor: ns-resize;
+    transition: background-color var(--duration-200) var(--ease-out);
+  }
+  
+  .preview-resizer:hover {
+    background-color: hsl(var(--card-dark));
+  }
+</style>

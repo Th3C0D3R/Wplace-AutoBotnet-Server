@@ -165,6 +165,25 @@ export class SessionManager {
       }
       
       if (!this.dashboard.detectedBotMode || !this.dashboard.projectConfig) {
+        // Intentar rehidratar desde el backend si hay un último guard upload
+        try {
+          const resp = await fetch(`${this.dashboard.apiBase()}/api/guard/last-upload`);
+          if (resp.ok) {
+            const js = await resp.json();
+            if (js && js.ok && js.data) {
+              this.dashboard.projectConfig = js.data;
+              this.dashboard.detectedBotMode = 'Guard';
+              const detectedEl = document.getElementById('detected-mode');
+              if (detectedEl) detectedEl.textContent = `Detected mode: ${this.dashboard.detectedBotMode}`;
+              const statusEl = document.getElementById('file-status');
+              if (statusEl) statusEl.textContent = `Loaded from server: ${js.filename || 'guard.json'}`;
+              try { this.dashboard.previewManager.requestPreviewRefreshThrottle(); } catch {}
+            }
+          }
+        } catch {}
+      }
+
+      if (!this.dashboard.detectedBotMode || !this.dashboard.projectConfig) {
         this.dashboard.log('⚠️ Carga un proyecto antes de pedir un lote');
         return;
       }
@@ -401,6 +420,13 @@ export class SessionManager {
       }
       
       if (statusEl) statusEl.textContent = 'Reading...';
+      
+      // Mostrar barra de progreso para carga de archivo
+      this.dashboard.uiHelpers.showLoadingProgress(
+        'file-loading-progress', 
+        'file-loading-bar', 
+        'file-loading-percentage'
+      );
       
       const reader = new FileReader();
       reader.onload = async () => {

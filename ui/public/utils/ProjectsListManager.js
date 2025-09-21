@@ -88,6 +88,13 @@ export class ProjectsListManager {
 
   _loadProject(proj) {
     try {
+      // Mostrar barra de progreso para carga de proyecto
+      this.dashboard.uiHelpers.showLoadingProgress(
+        'projects-loading-progress', 
+        'projects-loading-bar', 
+        'projects-loading-percentage'
+      );
+      
       // Determinar modo a partir del proyecto/config
       const m = (proj.mode || '').toLowerCase();
       const looksImage = !!(proj?.config?.imageData);

@@ -15,17 +15,21 @@ const { title } = Astro.props;
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 		<meta name="generator" content={Astro.generator} />
 		<title>{title}</title>
+		
+		<!-- Script anti-FOUC - Tema oscuro por defecto -->
+		<script is:inline>
+			(function() {
+				const theme = localStorage.getItem('wplace-theme') || 'dark';
+				document.documentElement.classList.toggle('light', theme === 'light');
+				document.documentElement.setAttribute('data-theme', theme);
+				document.documentElement.style.colorScheme = theme === 'light' ? 'light dark' : 'dark light';
+			})();
+		</script>
 	</head>
 	<body>
 		<slot />
 	</body>
 </html>
 <style is:global>
-	html {
-		font-family: system-ui, sans-serif;
-	}
-	code {
-		font-family: Menlo, Monaco, Lucida Console, Liberation Mono, DejaVu Sans Mono,
-			Bitstream Vera Sans Mono, Courier New, monospace;
-	}
+	@import "../styles/design-system.css";
 </style>

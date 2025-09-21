@@ -3,41 +3,66 @@
 import ServerConfig from './ServerConfig.astro';
 ---
 
-<div class="bg-card border rounded-lg p-6">
-  <h2 class="text-lg font-semibold mb-4 text-card-foreground">Control Panel</h2>
+<div class="panel animate-slide-up" style="position: relative;">
+  <h2 class="text-heading" style="margin-bottom: var(--space-4); color: hsl(var(--foreground));">Control Panel</h2>
+  
+  <!-- Botón limpiar en esquina inferior derecha -->
+  <button id="clear-project-btn" class="btn btn--ghost" style="position: absolute; bottom: var(--space-6); right: var(--space-6); padding: var(--space-2); min-width: auto; transition: all var(--duration-fast) var(--ease-out);" title="Limpiar Proyecto">
+    🧹
+  </button>
   
   <!-- Server Configuration -->
   <ServerConfig />
   
   <!-- Project Configuration -->
-  <div class="space-y-4 mt-6">
-    <div>
-      <label class="block text-sm font-medium mb-2 text-card-foreground">Project File</label>
-      <input type="file" id="project-file" accept=".json" class="w-full p-2 border rounded-md bg-background text-foreground">
-      <div id="file-status" class="mt-2 text-sm text-muted-foreground">No file selected</div>
-      <div id="file-analysis" class="mt-1 text-xs text-blue-600" style="display: none;"></div>
+  <div style="margin-top: var(--space-6);">
+    <div style="margin-bottom: var(--space-4);">
+      <label class="text-body" style="display: block; font-weight: 500; margin-bottom: var(--space-2); color: hsl(var(--foreground));">Project File</label>
+      <input type="file" id="project-file" accept=".json" class="input">
+      <div id="file-status" class="text-caption text-muted" style="margin-top: var(--space-2);">No file selected</div>
+      <div id="file-analysis" class="text-caption text-primary" style="margin-top: var(--space-1); display: none;"></div>
+      
+      <!-- Loading progress bar -->
+      <div id="file-loading-progress" style="margin-top: var(--space-3); display: none;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-1);">
+          <span class="text-caption text-muted">Loading project...</span>
+          <span id="file-loading-percentage" class="text-caption text-muted">0%</span>
+        </div>
+        <div class="progress">
+          <div id="file-loading-bar" class="progress__bar" style="width: 0%"></div>
+        </div>
+      </div>
     </div>
 
     <!-- Control Buttons -->
-    <div class="flex space-x-2 pt-4">
-      <button id="start-btn" class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-all duration-300 ease-in-out relative overflow-hidden" disabled>
-        <span id="start-btn-text" class="transition-opacity duration-300 ease-in-out">Start</span>
-        <div id="start-btn-spinner" class="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-300 ease-in-out">
-          <div class="w-5 h-5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin"></div>
+    <div style="display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-6);">
+      <button id="start-btn" class="btn btn--primary" disabled style="position: relative; overflow: hidden;">
+        <span id="start-btn-text" style="transition: opacity var(--duration-normal) var(--ease-out);">Start</span>
+        <div id="start-btn-spinner" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0; transition: opacity var(--duration-normal) var(--ease-out);">
+          <div style="width: 16px; height: 16px; border: 2px solid hsl(var(--primary-foreground)); border-top-color: transparent; border-radius: var(--radius-full); animation: spin 1s linear infinite;"></div>
         </div>
       </button>
-      <button id="pause-btn" class="px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/90 disabled:opacity-50" disabled>
-        Pause
+      <button id="pause-btn" class="btn btn--secondary" disabled>
       </button>
-      <button id="stop-btn" class="px-4 py-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 disabled:opacity-50" disabled>
+      <button id="stop-btn" class="btn btn--danger" disabled>
         Stop
       </button>
-      <button id="one-batch-btn" class="px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-500 disabled:opacity-50" disabled>
+      <button id="one-batch-btn" class="btn btn--primary" disabled style="background-color: hsl(var(--warning)); color: hsl(var(--warning-foreground));">
         🎯 Un lote
-      </button>
-      <button id="clear-project-btn" class="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600">
-        🧹 Limpiar Proyecto
       </button>
     </div>
   </div>
 </div>
+
+<style>
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  
+  /* Animación específica para el botón limpiar */
+  #clear-project-btn:active {
+    animation: cleanPulse 0.6s ease-in-out;
+  }
+</style>

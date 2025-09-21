@@ -419,4 +419,68 @@ export class UIHelpers {
       windowHeight: window.innerHeight
     };
   }
+
+  /**
+   * Muestra y anima una barra de progreso de carga
+   */
+  showLoadingProgress(containerId, barId, percentageId, duration = 3000) {
+    const container = document.getElementById(containerId);
+    const bar = document.getElementById(barId);
+    const percentage = document.getElementById(percentageId);
+    
+    if (!container || !bar || !percentage) return;
+    
+    // Mostrar contenedor
+    container.style.display = 'block';
+    
+    // Reset inicial
+    bar.style.width = '0%';
+    percentage.textContent = '0%';
+    
+    // Simular progreso con pasos realistas
+    const steps = [
+      { percent: 15, delay: 200 },   // Lectura inicial del archivo
+      { percent: 35, delay: 500 },   // Parsing JSON
+      { percent: 60, delay: 800 },   // Validación de datos
+      { percent: 85, delay: 1200 },  // Generación de preview
+      { percent: 100, delay: 1500 }  // Finalización
+    ];
+    
+    let stepIndex = 0;
+    const animateStep = () => {
+      if (stepIndex >= steps.length) {
+        // Ocultar después de completar
+        setTimeout(() => {
+          container.style.display = 'none';
+        }, 800);
+        return;
+      }
+      
+      const step = steps[stepIndex];
+      bar.style.width = `${step.percent}%`;
+      percentage.textContent = `${step.percent}%`;
+      
+      stepIndex++;
+      setTimeout(animateStep, step.delay);
+    };
+    
+    // Iniciar animación
+    setTimeout(animateStep, 100);
+    
+    return {
+      hide: () => {
+        container.style.display = 'none';
+      }
+    };
+  }
+
+  /**
+   * Oculta una barra de progreso específica
+   */
+  hideLoadingProgress(containerId) {
+    const container = document.getElementById(containerId);
+    if (container) {
+      container.style.display = 'none';
+    }
+  }
 }

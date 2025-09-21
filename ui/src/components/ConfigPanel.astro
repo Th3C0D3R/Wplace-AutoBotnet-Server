@@ -3,11 +3,11 @@
 import PatternSelector from "./PatternSelector.astro";
 ---
 
-<div id="config-panel" class="bg-card border rounded-lg p-6 mt-6">
-  <h2 class="text-lg font-semibold mb-4 text-card-foreground">Config</h2>
-  <div id="config-disabled-hint" class="text-sm text-muted-foreground mb-3" style="display:none;">Conecta al menos un slave para configurar.</div>
+<div id="config-panel" class="panel">
+  <h2 class="text-heading">Config</h2>
+  <div id="config-disabled-hint" class="text-caption text-muted" style="display:none;">Conecta al menos un slave para configurar.</div>
 
-  <div class="space-y-5">
+  <div class="panel__content">
     <!-- Protección / patrón -->
     <div>
       <!-- Componente con opciones y emojis alineados con Guard -->
@@ -16,103 +16,212 @@ import PatternSelector from "./PatternSelector.astro";
     </div>
 
     <!-- Toggles principales -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <div class="flex items-center justify-between">
-        <span class="text-sm text-card-foreground">Preferir color específico</span>
-        <label class="relative inline-flex w-9 h-5 items-center cursor-pointer select-none">
-          <input type="checkbox" id="gc-preferColor" class="opacity-0 absolute w-0 h-0" />
-          <span data-role="track" class="absolute inset-0 rounded-full transition-colors duration-300 bg-red-500"></span>
-          <span data-role="knob" class="absolute left-0.5 top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full transition-transform duration-300 translate-x-0"></span>
+    <div class="grid grid-2-responsive">
+      <div class="switch-group">
+        <span class="text-body">Preferir color específico</span>
+        <label class="switch">
+          <input type="checkbox" id="gc-preferColor" />
+          <span class="switch__track"></span>
+          <span class="switch__thumb"></span>
         </label>
       </div>
-      <div class="flex items-center justify-between">
-        <span class="text-sm text-card-foreground">Excluir colores específicos</span>
-        <label class="relative inline-flex w-9 h-5 items-center cursor-pointer select-none">
-          <input type="checkbox" id="gc-excludeColor" class="opacity-0 absolute w-0 h-0" />
-          <span data-role="track" class="absolute inset-0 rounded-full transition-colors duration-300 bg-red-500"></span>
-          <span data-role="knob" class="absolute left-0.5 top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full transition-transform duration-300 translate-x-0"></span>
+      <div class="switch-group">
+        <span class="text-body">Excluir colores específicos</span>
+        <label class="switch">
+          <input type="checkbox" id="gc-excludeColor" />
+          <span class="switch__track"></span>
+          <span class="switch__thumb"></span>
         </label>
       </div>
-      <div class="flex items-center justify-between">
-        <span class="text-sm text-card-foreground">Usar tiempos aleatorios</span>
-        <label class="relative inline-flex w-9 h-5 items-center cursor-pointer select-none">
-          <input type="checkbox" id="gc-randomWaitTime" class="opacity-0 absolute w-0 h-0" />
-          <span data-role="track" class="absolute inset-0 rounded-full transition-colors duration-300 bg-red-500"></span>
-          <span data-role="knob" class="absolute left-0.5 top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full transition-transform duration-300 translate-x-0"></span>
+      <div class="switch-group">
+        <span class="text-body">Usar tiempos aleatorios</span>
+        <label class="switch">
+          <input type="checkbox" id="gc-randomWaitTime" />
+          <span class="switch__track"></span>
+          <span class="switch__thumb"></span>
         </label>
       </div>
-      <div class="flex items-center justify-between">
-        <span class="text-sm text-card-foreground">Gastar todos al iniciar</span>
-        <label class="relative inline-flex w-9 h-5 items-center cursor-pointer select-none">
-          <input type="checkbox" id="gc-spendAllPixelsOnStart" class="opacity-0 absolute w-0 h-0" />
-          <span data-role="track" class="absolute inset-0 rounded-full transition-colors duration-300 bg-red-500"></span>
-          <span data-role="knob" class="absolute left-0.5 top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full transition-transform duration-300 translate-x-0"></span>
+      <div class="switch-group">
+        <span class="text-body">Gastar todos al iniciar</span>
+        <label class="switch">
+          <input type="checkbox" id="gc-spendAllPixelsOnStart" />
+          <span class="switch__track"></span>
+          <span class="switch__thumb"></span>
         </label>
       </div>
     </div>
 
     <!-- Números -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <div>
-        <label class="block text-sm font-medium mb-2 text-card-foreground">Cargas mínimas para esperar</label>
-        <input type="number" id="gc-minChargesToWait" min="0" class="w-full p-2 border rounded-md bg-background text-foreground" />
+    <div class="grid grid-2-responsive">
+      <div class="input-group">
+        <label class="input-label">Cargas mínimas para esperar</label>
+        <input type="number" id="gc-minChargesToWait" min="0" class="input" />
       </div>
-      <div>
-        <label class="block text-sm font-medium mb-2 text-card-foreground">Píxeles por lote</label>
-        <input type="number" id="gc-pixelsPerBatch" min="1" class="w-full p-2 border rounded-md bg-background text-foreground" />
+      <div class="input-group">
+        <label class="input-label">Píxeles por lote</label>
+        <input type="number" id="gc-pixelsPerBatch" min="1" class="input" />
       </div>
-      <div>
-        <label class="block text-sm font-medium mb-2 text-card-foreground">Máximo reintentos por lote</label>
-        <input type="number" id="gc-maxRetries" min="1" max="10" value="3" class="w-full p-2 border rounded-md bg-background text-foreground" />
+      <div class="input-group">
+        <label class="input-label">Máximo reintentos por lote</label>
+        <input type="number" id="gc-maxRetries" min="1" max="10" value="3" class="input" />
       </div>
-      <div>
-        <label class="block text-sm font-medium mb-2 text-card-foreground">Estrategia de distribución</label>
-        <select id="gc-chargeStrategy" class="w-full p-2 border rounded-md bg-background text-foreground">
+      <div class="input-group">
+        <label class="input-label">Estrategia de distribución</label>
+        <select id="gc-chargeStrategy" class="input">
           <option value="greedy">Greedy (óptimo API)</option>
           <option value="balanced">Balanced (proporcional)</option>
           <option value="round_robin">Round Robin</option>
         </select>
       </div>
-      <div>
-        <label class="block text-sm font-medium mb-2 text-card-foreground">Bloqueo tras pintar (s)</label>
-        <input type="number" id="gc-recentLockSeconds" min="0" class="w-full p-2 border rounded-md bg-background text-foreground" />
+      <div class="input-group">
+        <label class="input-label">Bloqueo tras pintar (s)</label>
+        <input type="number" id="gc-recentLockSeconds" min="0" class="input" />
       </div>
       <div id="gc-random-times" class="contents">
-        <div>
-          <label class="block text-sm font-medium mb-2 text-card-foreground">Tiempo mínimo (s)</label>
-          <input type="number" id="gc-randomWaitMin" step="0.1" min="0" class="w-full p-2 border rounded-md bg-background text-foreground" />
+        <div class="input-group">
+          <label class="input-label">Tiempo mínimo (s)</label>
+          <input type="number" id="gc-randomWaitMin" step="0.1" min="0" class="input" />
         </div>
-        <div>
-          <label class="block text-sm font-medium mb-2 text-card-foreground">Tiempo máximo (s)</label>
-          <input type="number" id="gc-randomWaitMax" step="0.1" min="0" class="w-full p-2 border rounded-md bg-background text-foreground" />
+        <div class="input-group">
+          <label class="input-label">Tiempo máximo (s)</label>
+          <input type="number" id="gc-randomWaitMax" step="0.1" min="0" class="input" />
         </div>
       </div>
-      <div>
-        <label class="block text-sm font-medium mb-2 text-card-foreground">Umbral de color</label>
-        <input type="number" id="gc-colorThreshold" min="0" max="255" class="w-full p-2 border rounded-md bg-background text-foreground" />
+      <div class="input-group">
+        <label class="input-label">Umbral de color</label>
+        <input type="number" id="gc-colorThreshold" min="0" max="255" class="input" />
       </div>
     </div>
 
     <!-- Paletas -->
     <div id="gc-preferredColors-section" style="display:none;">
-      <div class="flex items-center justify-between mb-2">
-        <h3 class="text-sm font-medium text-card-foreground">Preferidos</h3>
-        <button id="gc-clearPreferred" class="px-2 py-1 bg-red-500 text-white rounded text-xs" style="display:none;">Limpiar</button>
+      <div class="color-section-header">
+        <h3 class="text-body text-medium">Colores Preferidos</h3>
+        <button id="gc-clearPreferred" class="btn btn--danger btn--small" style="display:none;">Limpiar</button>
       </div>
-      <div id="gc-preferredColors" class="flex flex-wrap gap-2"></div>
+      <div id="gc-available-colors-preferred" class="color-palette-grid"></div>
     </div>
     <div id="gc-excludedColors-section" style="display:none;">
-      <div class="flex items-center justify-between mb-2">
-        <h3 class="text-sm font-medium text-card-foreground">Excluidos</h3>
-        <button id="gc-clearExcluded" class="px-2 py-1 bg-red-500 text-white rounded text-xs" style="display:none;">Limpiar</button>
+      <div class="color-section-header">
+        <h3 class="text-body text-medium">Colores Excluidos</h3>
+        <button id="gc-clearExcluded" class="btn btn--danger btn--small" style="display:none;">Limpiar</button>
       </div>
-      <div id="gc-excludedColors" class="flex flex-wrap gap-2"></div>
+      <div id="gc-available-colors-excluded" class="color-palette-grid"></div>
     </div>
 
     <!-- Footer -->
-    <div class="flex justify-end gap-2 pt-2">
-      <button id="gc-reset-btn" class="px-3 py-2 bg-gray-600 text-white rounded-md" title="Restablecer">🔄</button>
+    <div class="panel__footer">
+      <button id="gc-reset-btn" class="btn btn--ghost" title="Restablecer">🔄</button>
     </div>
-    <div class="text-xs text-muted-foreground"><span id="gc-status"></span></div>
+    <div class="text-caption text-muted"><span id="gc-status"></span></div>
   </div>
 </div>
+
+<!-- Styles específicos para ConfigPanel -->
+<style>
+  .grid {
+    display: grid;
+    gap: var(--space-4);
+  }
+  
+  .grid-2-responsive {
+    grid-template-columns: 1fr;
+  }
+  
+  @media (min-width: 640px) {
+    .grid-2-responsive {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  
+  .switch-group {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+  
+  .input-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  
+  .input-label {
+    color: hsl(var(--foreground));
+    font-size: var(--text-sm);
+    font-weight: 500;
+  }
+  
+  .color-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-2);
+  }
+  
+  .color-section-subheader {
+    margin: var(--space-2) 0 var(--space-1) 0;
+  }
+  
+  .color-palette {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .color-palette-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(32px, 1fr));
+    gap: var(--space-1);
+    padding: var(--space-2);
+    background: hsl(var(--muted));
+    border-radius: var(--radius);
+    max-height: 120px;
+    overflow-y: auto;
+  }
+
+  .color-chip {
+    position: relative;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius);
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .color-chip:hover {
+    transform: scale(1.1);
+    border-color: hsl(var(--foreground));
+  }
+
+  .color-chip.selected {
+    border-color: hsl(var(--primary));
+    box-shadow: 0 0 0 2px hsl(var(--primary) / 0.3);
+  }
+
+  .color-chip::after {
+    content: attr(data-id);
+    position: absolute;
+    bottom: -18px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    color: hsl(var(--foreground));
+    white-space: nowrap;
+  }
+  
+  .contents {
+    display: contents;
+  }
+  
+  .panel__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-2);
+    padding-top: var(--space-2);
+    border-top: 1px solid hsl(var(--border));
+    margin-top: var(--space-4);
+  }
+</style>

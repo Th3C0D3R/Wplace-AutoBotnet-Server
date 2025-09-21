@@ -2,27 +2,104 @@
 // Connected slaves panel with master toggle and logs
 ---
 
-<h2 class="text-lg font-semibold text-card-foreground">Connected Slaves</h2>
+<div class="panel">
+  <div class="panel-header-with-toggle">
+    <h2 class="text-heading">Connected Slaves</h2>
+    <label class="switch">
+      <input type="checkbox" id="toggle-all-slaves">
+      <span class="switch__track"></span>
+      <span class="switch__thumb"></span>
+    </label>
+  </div>
 
-<!-- Master toggle for select/deselect all -->
-<div class="flex items-center gap-2 select-none">
-  <label class="relative inline-flex w-9 h-5 items-center cursor-pointer select-none">
-    <input type="checkbox" id="toggle-all-slaves" class="opacity-0 absolute w-0 h-0">
-    <span data-role="track" class="absolute inset-0 rounded-full transition-colors duration-300 bg-red-500"></span>
-    <span data-role="knob" class="absolute left-0.5 top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full transition-transform duration-300 translate-x-0"></span>
-  </label>
-  <span class="text-sm text-muted-foreground">Select all</span>
+  <div class="panel__content">
+
+    <!-- Slaves list -->
+    <div id="slaves-list" class="slaves-list">
+      No slaves connected. Inject Auto-Slave.js in your browser.
+    </div>
+
+    <!-- Activity Logs under Slaves with collapsible animation -->
+    <div class="logs-section">
+      <details id="logs-section" class="logs-details">
+        <summary class="logs-summary">Activity Logs</summary>
+        <div id="logs-container" class="logs-container"></div>
+      </details>
+    </div>
+  </div>
 </div>
 
-<!-- Slaves list -->
-<div id="slaves-list" class="space-y-3 overflow-y-auto max-h-[960px] pr-1">
-  No slaves connected. Inject Auto-Slave.js in your browser.
-</div>
-
-<!-- Activity Logs under Slaves with collapsible animation -->
-<div class="mt-4">
-  <details id="logs-section" class="group">
-    <summary class="text-sm text-muted-foreground cursor-pointer select-none">Activity Logs</summary>
-    <div id="logs-container" class="mt-2 text-xs text-muted-foreground max-h-[300px] overflow-y-auto whitespace-pre-wrap"></div>
-  </details>
-</div>
+<!-- Styles específicos para SlavesPanel -->
+<style>
+  .panel-header-with-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-4);
+  }
+  
+  .slaves-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    overflow-y: auto;
+    max-height: 960px;
+    padding-right: var(--space-1);
+    margin: var(--space-4) 0;
+  }
+  
+  .logs-section {
+    margin-top: var(--space-4);
+    border-top: 1px solid hsl(var(--border));
+    padding-top: var(--space-4);
+  }
+  
+  .logs-details {
+    group: true;
+  }
+  
+  .logs-summary {
+    color: hsl(var(--muted-foreground));
+    font-size: var(--text-sm);
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    transition: color var(--duration-200) var(--ease-out);
+  }
+  
+  .logs-summary:hover {
+    color: hsl(var(--foreground));
+  }
+  
+  .logs-summary::-webkit-details-marker {
+    display: none;
+  }
+  
+  .logs-summary::before {
+    content: '▶';
+    transition: transform var(--duration-200) var(--ease-out);
+    font-size: var(--text-xs);
+    color: hsl(var(--muted-foreground));
+  }
+  
+  .logs-details[open] .logs-summary::before {
+    transform: rotate(90deg);
+  }
+  
+  .logs-container {
+    margin-top: var(--space-2);
+    font-size: var(--text-xs);
+    color: hsl(var(--muted-foreground));
+    max-height: 300px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    background-color: hsl(var(--card));
+    padding: var(--space-3);
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-md);
+    font-family: var(--font-mono);
+  }
+</style>

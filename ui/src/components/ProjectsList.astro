@@ -2,8 +2,36 @@
 // Componente que renderiza la sección de lista de proyectos
 ---
 
-<section id="projects-section" class="mt-6">
-  <h2 class="text-lg font-semibold mb-2">Proyectos cargados</h2>
-  <div id="projects-list" class="space-y-2"></div>
-  <p id="projects-empty" class="text-sm text-muted-foreground" style="display:none;">No hay proyectos todavía.</p>
-</section>
+<div class="panel">
+  <h2 class="text-heading">Proyectos cargados</h2>
+  <div class="panel__content">
+    <div id="projects-list" class="projects-list"></div>
+    <p id="projects-empty" class="text-body text-muted projects-empty" style="display:none;">No hay proyectos todavía.</p>
+    
+    <!-- Loading progress bar for projects -->
+    <div id="projects-loading-progress" style="display: none;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-1);">
+        <span class="text-caption text-muted">Loading project preview...</span>
+        <span id="projects-loading-percentage" class="text-caption text-muted">0%</span>
+      </div>
+      <div class="progress">
+        <div id="projects-loading-bar" class="progress__bar" style="width: 0%"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Styles específicos para ProjectsList -->
+<style>
+  .projects-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  
+  .projects-empty {
+    text-align: center;
+    padding: var(--space-6);
+    font-style: italic;
+  }
+</style>

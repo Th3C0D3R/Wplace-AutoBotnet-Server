@@ -469,6 +469,15 @@ export class PreviewManager {
       this.guardPreview.area = area;
       this.renderGuardPreviewCanvas({ analysis, area });
       
+      // Actualizar paleta de colores si hay datos disponibles
+      if (data.availableColors && this.dashboard.configManager) {
+        try {
+          this.dashboard.configManager.renderAllInlineChips();
+        } catch (err) {
+          this.dashboard.log('⚠️ Error updating color palette: ' + err.message);
+        }
+      }
+      
     } catch (err) {
       this.dashboard.log('⚠️ updatePreviewFromSlave error: ' + err.message);
       console.error('Preview processing error:', err, data);

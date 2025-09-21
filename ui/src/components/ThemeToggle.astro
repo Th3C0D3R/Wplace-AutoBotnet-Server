@@ -1,0 +1,139 @@
+---
+// Theme toggle component - Minimalista estilo Apple
+---
+
+<button 
+  id="theme-toggle" 
+  class="btn btn--ghost"
+  aria-label="Toggle theme"
+  title="Cambiar tema"
+>
+  <!-- Sol (tema claro) -->
+  <svg 
+    class="theme-icon theme-icon--sun" 
+    width="18" 
+    height="18" 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    stroke-width="2"
+  >
+    <circle cx="12" cy="12" r="5"/>
+    <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+  </svg>
+  
+  <!-- Luna (tema oscuro) -->
+  <svg 
+    class="theme-icon theme-icon--moon" 
+    width="18" 
+    height="18" 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    stroke-width="2"
+  >
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+  </svg>
+</button>
+
+<style>
+  #theme-toggle {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+  }
+  
+  .theme-icon {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    transition: 
+      opacity var(--duration-normal) var(--ease-out),
+      transform var(--duration-normal) var(--ease-out);
+  }
+  
+  /* Estado inicial: tema oscuro (por defecto) */
+  .theme-icon--sun {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(90deg) scale(0.8);
+  }
+  
+  .theme-icon--moon {
+    opacity: 1;
+    transform: translate(-50%, -50%) rotate(0deg) scale(1);
+  }
+  
+  /* Estado tema claro */
+  .light .theme-icon--sun {
+    opacity: 1;
+    transform: translate(-50%, -50%) rotate(0deg) scale(1);
+  }
+  
+  .light .theme-icon--moon {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(-90deg) scale(0.8);
+  }
+</style>
+
+<script>
+  // Theme toggle functionality con tema oscuro por defecto
+  function initThemeToggle() {
+    const toggleButton = document.getElementById('theme-toggle');
+    if (!toggleButton) return;
+    
+    const html = document.documentElement;
+    
+    // Aplicar tema oscuro por defecto si no hay preferencia guardada
+    function getInitialTheme() {
+      const saved = localStorage.getItem('wplace-theme');
+      if (saved) return saved;
+      
+      // Por defecto tema oscuro
+      return 'dark';
+    }
+    
+    function setTheme(theme) {
+      html.classList.toggle('light', theme === 'light');
+      html.setAttribute('data-theme', theme);
+      localStorage.setItem('wplace-theme', theme);
+      
+      // Actualizar color-scheme
+      html.style.colorScheme = theme === 'light' ? 'light dark' : 'dark light';
+    }
+    
+    function getCurrentTheme() {
+      return html.classList.contains('light') ? 'light' : 'dark';
+    }
+    
+    function toggleTheme() {
+      const currentTheme = getCurrentTheme();
+      const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      setTheme(newTheme);
+    }
+    
+    // Aplicar tema inicial
+    const initialTheme = getInitialTheme();
+    setTheme(initialTheme);
+    
+    // Event listener para el toggle
+    toggleButton.addEventListener('click', toggleTheme);
+    
+    // Opcional: Sync con cambios del sistema (pero mantenemos preferencia del usuario)
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    mediaQuery.addEventListener('change', (e) => {
+      // Solo aplicar si no hay preferencia guardada
+      if (!localStorage.getItem('wplace-theme')) {
+        setTheme(e.matches ? 'dark' : 'light');
+      }
+    });
+  }
+  
+  // Inicializar cuando el DOM esté listo
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initThemeToggle);
+  } else {
+    initThemeToggle();
+  }
+</script>

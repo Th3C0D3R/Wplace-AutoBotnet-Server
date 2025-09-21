@@ -421,6 +421,13 @@ export class SessionManager {
       
       if (statusEl) statusEl.textContent = 'Reading...';
       
+      // Mostrar barra de progreso para carga de archivo
+      this.dashboard.uiHelpers.showLoadingProgress(
+        'file-loading-progress', 
+        'file-loading-bar', 
+        'file-loading-percentage'
+      );
+      
       const reader = new FileReader();
       reader.onload = async () => {
         try {
