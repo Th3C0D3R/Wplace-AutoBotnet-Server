@@ -53,6 +53,8 @@ WPlace Master Server is a centralized coordination system that allows you to eff
 
 The project includes a <mcfile name="start.sh" script path="/Users/alvaroalonso/workspace/project-place/wplace-masterserver/start.sh"></mcfile> which simplifies the startup process:
 
+(LINUX)
+
 ```bash
 # Make the script executable
 chmod +x start.sh
@@ -67,6 +69,19 @@ chmod +x start.sh
 ./start.sh --help
 ```
 
+(WINDOWS)
+
+```ps1
+# Start the entire system
+powershell.exe .\start.ps1
+
+# Start only the frontend (useful for development)
+powershell.exe .\start.ps1 -FrontendOnly
+
+# View help
+powershell.exe .\start.ps1 -Help
+```
+ 
 **Script Features:**
 - ✅ Automatic Docker check
 - ✅ Automatic creation of the `.env` file
@@ -92,9 +107,12 @@ If you prefer manual control over the process:
 git clone <repository-url>
 cd wplace-masterserver
 
-# 2. Use the startup script (recommended)
+# 2.1. Use the startup script (recommended)
 chmod +x start.sh
 ./start.sh
+
+# 2.2. Use the startup script (recommended)
+powershell.exe .\\start.ps1
 ```
 
 ### 2. Local deployment (development)
@@ -127,12 +145,21 @@ docker-compose ps
 
 For deployments to remote servers, use the automated script:
 
+(LINUX)
+
 ```bash
 # Make the script executable
 chmod +x deployment.sh
 
 # Run deployment
 ./deployment.sh
+```
+
+(WINDOWS)
+
+```ps1
+# Run deployment
+./deployment.ps1
 ```
 
 The script will prompt you for:
@@ -182,7 +209,7 @@ docker-compose up -d
 - ✅ Support for multiple domains
 - ✅ Automatic reverse proxy configuration
 
-### Option 2: Let's Encrypt manually
+### Option 2: Let's Encrypt manually (LINUX ONLY FOR NOW)
 
 If you prefer to configure Let's Encrypt manually:
 
@@ -225,19 +252,20 @@ environment:
 ## 🏗️ System architecture
 
 ```
-┌─────────────────┐ ┌─────────────────┐ ┌──────────────────┐
-│ Web Interface │ │ Master Server │ │ Slave Bot │
-│ (Astro/React) │◄──►│ (FastAPI) │◄──►│ (WebSocket) │
-│ Port 3004 │ │ Port 8008 │ │ │
-└──────────────────┘ └───────────────────┘ └──────────────────┘
-│
-▼
-┌──────────────────┐
-│ PostgreSQL │
-│ wplace_master │
-│ + Redis │
-└──────────────────┘
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│  Interface Web  │    │  Master Server  │    │   Bot Esclavo   │
+│   (Astro/React) │◄──►│    (FastAPI)    │◄──►│   (WebSocket)   │
+│   Puerto 3004   │    │   Puerto 8008   │    │                 │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                              │
+                              ▼
+                    ┌─────────────────┐
+                    │   PostgreSQL    │
+                    │ wplace_master   │
+                    │   + Redis       │
+                    └─────────────────┘
 ```
+
 
 ### Core Components
 
@@ -378,10 +406,10 @@ The dashboard displays:
 
 ```bash
 # Recommended method: Use the startup script
-./start.sh
+./start.sh    #OR    powershell.exe .\start.ps1
 
 # For frontend development only
-./start.sh --frontend-only
+./start.sh --frontend-only    #OR    powershell.exe .\start.ps1 -FrontendOnly
 
 # Manual method with Docker Compose
 docker-compose up -d
