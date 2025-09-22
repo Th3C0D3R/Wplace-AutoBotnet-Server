@@ -1,421 +1,420 @@
-# ⚠️ Versión Beta – Puede contener errores
+# ⚠️ Beta Version – May contain bugs
 
-> **IMPORTANTE**: Este proyecto está actualmente en **fase beta**.  
-> Algunas funciones pueden no estar completamente implementadas o presentar errores.  
-> Se recomienda usarlo con precaución y reportar cualquier problema encontrado.
+> **IMPORTANT**: This project is currently in **beta phase**.
+> Some features may not be fully implemented or may be buggy.
+> Please use with caution and report any issues.
 
 ---
 
 # WPlace Master Server
 
-<p align="center">
-  <strong>🎯 Servidor maestro para coordinar bots de WPlace con interfaz web de gestión</strong>
+<p align="center"> 
+<strong>🎯 Master server to coordinate WPlace bots with management web interface</strong>
 </p>
 
-<p align="center">
-  <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI">
-  <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker">
-  <img src="https://img.shields.io/badge/Astro-FF5D01?style=for-the-badge&logo=astro&logoColor=white" alt="Astro">
-  <img src="https://img.shields.io/badge/PostgreSQL-336791?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL">
-  <img src="https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white" alt="Redis">
+<p align="center"> 
+<img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI"> 
+<img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker"> 
+<img src="https://img.shields.io/badge/Astro-FF5D01?style=for-the-badge&logo=astro&logoColor=white" alt="Astro"> 
+<img src="https://img.shields.io/badge/PostgreSQL-336791?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL"> 
+<img src="https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white" alt="Redis">
 </p>
 
-## ☕ Apoyo al desarrollo
+## ☕ Development support
 
-Si este proyecto te ha sido útil, considera apoyar su desarrollo:
+If this project has been useful to you, consider supporting its development:
 
-<p align="center">
-  <a href="https://buymeacoffee.com/alarisco">
+<p align="center"> 
+  <a href="https://buymeacoffee.com/alarisco"> 
     <img src="https://img.shields.io/badge/Buy%20Me%20A%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me A Coffee">
   </a>
 </p>
 
 ---
+## 📋 Description
 
-## 📋 Descripción
+WPlace Master Server is a centralized coordination system that allows you to efficiently manage multiple WPlace bots. It provides a modern web interface for controlling slave bots, configuring protection (Guard) and automatic painting (Image) projects, and monitoring their status in real time.
 
-WPlace Master Server es un sistema de coordinación centralizado que permite gestionar múltiples bots de WPlace de forma eficiente. Proporciona una interfaz web moderna para controlar bots esclavos, configurar proyectos de protección (Guard) y pintura automática (Image), y monitorear el estado en tiempo real.
+### ✨ Key Features
 
-### ✨ Características principales
-
-- 🤖 **Gestión de bots esclavos**: Conecta y coordina múltiples instancias de bots
-- 🎨 **Modo Image**: Automatización para crear pixel art desde imágenes
-- 🛡️ **Modo Guard**: Protección automática de áreas específicas del canvas
-- 🌐 **Interfaz web moderna**: Panel de control intuitivo construido con Astro y React
-- 📊 **Monitoreo en tiempo real**: WebSockets para actualizaciones instantáneas
-- 🔄 **Compresión inteligente**: Optimización automática de mensajes grandes
-- 📈 **Telemetría avanzada**: Estadísticas detalladas de rendimiento
+- 🤖 **Slave Bot Management**: Connect and coordinate multiple bot instances
+- 🎨 **Image Mode**: Automation for creating pixel art from images
+- 🛡️ **Guard Mode**: Automatic protection of specific areas of the canvas
+- 🌐 **Modern Web Interface**: Intuitive dashboard built with Astro and React
+- 📊 **Real-Time Monitoring**: WebSockets for instant updates
+- 🔄 **Smart Compression**: Automatic optimization of large messages
+- 📈 **Advanced Telemetry**: Detailed performance statistics
 
 ---
 
-## 🚀 Inicio rápido
+## 🚀 Quick Start
 
-### Método 1: Script de inicio automático (Recomendado)
+### Method 1: Autostart Script (Recommended)
 
-El proyecto incluye un script <mcfile name="start.sh" path="/Users/alvaroalonso/workspace/project-place/wplace-masterserver/start.sh"></mcfile> que simplifica el proceso de inicio:
+The project includes a <mcfile name="start.sh" script path="/Users/alvaroalonso/workspace/project-place/wplace-masterserver/start.sh"></mcfile> which simplifies the startup process:
 
 ```bash
-# Hacer el script ejecutable
+# Make the script executable
 chmod +x start.sh
 
-# Iniciar todo el sistema
+# Start the entire system
 ./start.sh
 
-# Solo iniciar el frontend (útil para desarrollo)
+# Start only the frontend (useful for development)
 ./start.sh --frontend-only
 
-# Ver ayuda
+# View help
 ./start.sh --help
 ```
 
-**Características del script:**
-- ✅ Verificación automática de Docker
-- ✅ Creación automática del archivo `.env`
-- ✅ Construcción e inicio de contenedores
-- ✅ Verificación de salud de servicios
-- ✅ Modo solo-frontend para desarrollo
-- ✅ Mensajes informativos y solución de problemas
+**Script Features:**
+- ✅ Automatic Docker check
+- ✅ Automatic creation of the `.env` file
+- ✅ Building and starting containers
+- ✅ Service health check
+- ✅ Frontend-only mode for development
+- ✅ Informational messages and troubleshooting
 
-### Método 2: Docker Compose manual
+### Method 2: Docker Compose Manually
 
-Si prefieres control manual sobre el proceso:
+If you prefer manual control over the process:
 
-### Prerrequisitos
+### Prerequisites
 
-- 🐳 **Docker** y **Docker Compose** instalados
-- 🌐 **Puerto 3004** (interfaz web) y **8008** (API) disponibles
-- 💾 Al menos **2GB de RAM** disponible para los contenedores
+- 🐳 **Docker** and **Docker Compose** installed
+- 🌐 **Port 3004** (web interface) and **8008** (API) available
+- 💾 At least **2GB of RAM** available for containers
 
-### Instalación
+### Installation
 
 ```bash
-# 1. Clonar el repositorio
+# 1. Clone the repository
 git clone <repository-url>
 cd wplace-masterserver
 
-# 2. Usar el script de inicio (recomendado)
+# 2. Use the startup script (recommended)
 chmod +x start.sh
 ./start.sh
 ```
 
-### 2. Despliegue local (desarrollo)
+### 2. Local deployment (development)
 
 ```bash
-# Crear archivo de configuración
+# Create configuration file
 cat > .env << EOF
 REDIS_URL=redis://redis:6379
 DATABASE_URL=postgresql://wplace:wplace123@postgres:5432/wplace_master
 PYTHONUNBUFFERED=1
 EOF
 
-# Construir e iniciar servicios
+# Build and start services
 docker-compose up -d --build
 
-# Ver logs en tiempo real
+# View logs in real time
 docker-compose logs -f
 
-# Verificar que todo funciona
+# Verify that everything works
 docker-compose ps
 ```
 
-**Acceso:**
-- 🌐 **Interfaz web**: http://localhost:3004
-- 🔧 **API del servidor**: http://localhost:8008
-- 📊 **Base de datos PostgreSQL**: localhost:5432 (usuario: `wplace`, contraseña: `wplace123`, db: `wplace_master`)
+**Access:**
+- 🌐 **Web interface**: http://localhost:3004
+- 🔧 **Server API**: http://localhost:8008
+- 📊 **PostgreSQL database**: localhost:5432 (user: `wplace`, password: `wplace123`, db: `wplace_master`)
 - 🗄️ **Redis**: localhost:6379
 
-### 3. Despliegue en producción
+### 3. Production Deployment
 
-Para despliegues en servidores remotos, utiliza el script automatizado:
+For deployments to remote servers, use the automated script:
 
 ```bash
-# Hacer ejecutable el script
-chmod +x despliegue.sh
+# Make the script executable
+chmod +x deployment.sh
 
-# Ejecutar despliegue
-./despliegue.sh
+# Run deployment
+./deployment.sh
 ```
 
-El script te pedirá:
-- IP o dominio del servidor
-- Usuario SSH
-- Contraseña SSH
-- Ruta de instalación (por defecto: `/opt/wplace-masterserver`)
+The script will prompt you for:
+- Server IP or domain
+- SSH username
+- SSH password
+- Installation path (default: `/opt/wplace-masterserver`)
 
 ---
 
-## 🔒 Configuración SSL (Importante para bots no-localhost)
+## 🔒 SSL Configuration (Important for non-localhost bots)
 
-> ⚠️ **ADVERTENCIA**: Si planeas usar bots que NO sean localhost, DEBES configurar certificados SSL válidos. Los navegadores modernos bloquean conexiones WebSocket no seguras desde sitios HTTPS.
+> ⚠️ **WARNING**: If you plan to use bots other than localhost, you MUST configure valid SSL certificates. Modern browsers block insecure WebSocket connections from HTTPS sites.
 
-### Opción 1: Nginx Proxy Manager (Recomendado)
+### Option 1: Nginx Proxy Manager (Recommended)
 
-**Nginx Proxy Manager** es la forma más sencilla de gestionar certificados SSL automáticamente:
+**Nginx Proxy Manager** is the easiest way to manage SSL certificates automatically:
 
-1. **Instala Nginx Proxy Manager:**
+1. **Install Nginx Proxy Manager:**
 ```bash
-# Crear directorio para NPM
+# Create directory for NPM
 mkdir nginx-proxy-manager
 cd nginx-proxy-manager
 
-# Descargar docker-compose.yml de NPM
+# Download docker-compose.yml from NPM
 curl -o docker-compose.yml https://raw.githubusercontent.com/NginxProxyManager/nginx-proxy-manager/main/docker-compose.yml
 
-# Iniciar NPM
+# Start NPM
 docker-compose up -d
 ```
 
-2. **Configurar el proxy:**
-   - Accede a `http://tu-servidor:81`
-   - Login inicial: `admin@example.com` / `changeme`
-   - Crea un nuevo "Proxy Host":
-     - **Domain**: `tu-dominio.com`
-     - **Forward Hostname/IP**: `tu-servidor-ip`
-     - **Forward Port**: `8008` (puerto del WPlace Master Server)
-   - En la pestaña "SSL":
-     - Marca "Request a new SSL Certificate"
-     - Marca "Force SSL"
-     - Acepta los términos de Let's Encrypt
+2. **Configure the proxy:**
+- Go to `http://your-server:81`
+- Initial login: `admin@example.com` / `changeme`
+- Create a new "Proxy Host":
+- **Domain**: `your-domain.com`
+- **Forward Hostname/IP**: `your-server-ip`
+- **Forward Port**: `8008` (WPlace Master Server port)
+- In the "SSL":
+- Check "Request a new SSL Certificate"
+- Check "Force SSL"
+- Accept the Let's Encrypt terms
 
-3. **Ventajas de NPM:**
-   - ✅ Renovación automática de certificados
-   - ✅ Interfaz web intuitiva
-   - ✅ Soporte para múltiples dominios
-   - ✅ Configuración de proxy reverso automática
+3. **NPM Advantages:**
+- ✅ Automatic certificate renewal
+- ✅ Intuitive web interface
+- ✅ Support for multiple domains
+- ✅ Automatic reverse proxy configuration
 
-### Opción 2: Let's Encrypt manual
+### Option 2: Let's Encrypt manually
 
-Si prefieres configurar Let's Encrypt manualmente:
+If you prefer to configure Let's Encrypt manually:
 
 ```bash
-# Instalar Certbot
-sudo apt install certbot  # Ubuntu/Debian
-# brew install certbot    # macOS
+# Install Certbot
+sudo apt install certbot # Ubuntu/Debian
+# brew install certbot # macOS
 
-# Generar certificados
-sudo certbot certonly --standalone -d tu-dominio.com
+# Generate certificates
+sudo certbot certonly --standalone -d your-domain.com
 
-# Copiar certificados
-sudo cp /etc/letsencrypt/live/tu-dominio.com/fullchain.pem ./certs/
-sudo cp /etc/letsencrypt/live/tu-dominio.com/privkey.pem ./certs/
+# Copy certificates
+sudo cp /etc/letsencrypt/live/your-domain.com/fullchain.pem ./certs/
+sudo cp /etc/letsencrypt/live/your-domain.com/privkey.pem ./certs/
 sudo chown $USER:$USER ./certs/*
 ```
 
-### Opción 3: Certificados autofirmados (Solo para desarrollo)
+### Option 3: Self-signed certificates (Development only)
 
 ```bash
 mkdir -p certs
 openssl req -x509 -newkey rsa:4096 -keyout certs/privkey.pem -out certs/fullchain.pem -days 365 -nodes -subj "/C=ES/ST=State/L=City/O=Organization/CN=localhost"
 ```
 
-### Configuración en Docker Compose
+### Configuration in Docker Compose
 
-Para usar certificados locales, descomenta las líneas SSL en `docker-compose.yml`:
+To use local certificates, uncomment the SSL lines in `docker-compose.yml`:
 
 ```yaml
 server:
-  volumes:
-    - ./certs:/app/certs  # Descomenta esta línea
-  environment:
-    - SSL_CERT_PATH=/app/certs/fullchain.pem   # Descomenta
-    - SSL_KEY_PATH=/app/certs/privkey.pem      # Descomenta
+volumes:
+- ./certs:/app/certs # Uncomment this line
+environment:
+- SSL_CERT_PATH=/app/certs/fullchain.pem # Uncomment 
+- SSL_KEY_PATH=/app/certs/privkey.pem # Uncomment
 ```
 
 ---
 
-## 🏗️ Arquitectura del sistema
+## 🏗️ System architecture
 
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Interfaz Web  │    │  Master Server  │    │   Bot Esclavo   │
-│   (Astro/React) │◄──►│    (FastAPI)    │◄──►│   (WebSocket)   │
-│   Puerto 3004   │    │   Puerto 8008   │    │                 │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-                              │
-                              ▼
-                    ┌─────────────────┐
-                    │   PostgreSQL    │
-                    │ wplace_master   │
-                    │   + Redis       │
-                    └─────────────────┘
+┌─────────────────┐ ┌─────────────────┐ ┌──────────────────┐
+│ Web Interface │ │ Master Server │ │ Slave Bot │
+│ (Astro/React) │◄──►│ (FastAPI) │◄──►│ (WebSocket) │
+│ Port 3004 │ │ Port 8008 │ │ │
+└──────────────────┘ └───────────────────┘ └──────────────────┘
+│
+▼
+┌──────────────────┐
+│ PostgreSQL │
+│ wplace_master │
+│ + Redis │
+└──────────────────┘
 ```
 
-### Componentes principales
+### Core Components
 
-- **Master Server**: API FastAPI con WebSockets para coordinación
-- **Interfaz Web**: Panel de control construido con Astro y React
-- **PostgreSQL**: Base de datos para persistencia de configuraciones
-- **Redis**: Cache y gestión de sesiones en tiempo real
+- **Master Server**: FastAPI with WebSockets for coordination
+- **Web Interface**: Control panel built with Astro and React
+- **PostgreSQL**: Database for configuration persistence
+- **Redis**: Real-time session caching and management
 
 ---
 
-## 🔧 Configuración avanzada
+## 🔧 Advanced Configuration
 
-### Configuración de servidor remoto
+### Remote Server Configuration
 
-Por defecto, la interfaz web se conecta al servidor local (`localhost:8008`). Para conectarse a un servidor remoto, edita directamente el archivo `docker-compose.yml`:
+By default, the web interface connects to the local server (`localhost:8008`). To connect to a remote server, edit the `docker-compose.yml` file directly:
 
-#### Configuración en docker-compose.yml
+#### Configuration in docker-compose.yml
 
-1. **Abrir el archivo `docker-compose.yml`**
-2. **Localizar el servicio `ui`** y la sección `build` > `args`
-3. **Modificar la línea `SERVER_URL`:**
+1. **Open the `docker-compose.yml` file**
+2. **Locate the `ui` service** and the `build` > `args` section
+3. **Modify the `SERVER_URL` line:**
 
 ```yaml
 ui:
-  build:
-    context: ./ui
-    dockerfile: Dockerfile
-    args:
-      # Cambiar esta línea para configurar servidor remoto
-      - SERVER_URL="http://tu-servidor:8008"  # ← Editar aquí
-  # ... resto de configuración
+build:
+context: ./ui
+dockerfile: Dockerfile
+args:
+# Change this line to configure the remote server
+- SERVER_URL="http://your-server:8008" # ← Edit here
+# ... rest of the configuration
 ```
 
-**Ejemplos de configuración:**
+**Configuration examples:**
 
 ```yaml
-# Servidor local (por defecto)
+# Local server (default)
 - SERVER_URL=""
 
-# Servidor en red local
+# Server on the local network
 - SERVER_URL="http://192.168.1.100:8008"
 
-# Servidor remoto con dominio
-- SERVER_URL="https://wplace.mi-dominio.com:8008"
+# Remote server with domain
+- SERVER_URL="https://wplace.my-domain.com:8008"
 
-# Servidor en Docker con IP específica  
+# Docker server with specific IP
 - SERVER_URL="http://10.0.0.5:8008"
 ```
 
-#### Aplicar cambios
+#### Apply changes
 
-Después de modificar el `docker-compose.yml`:
+After modifying `docker-compose.yml`:
 
 ```bash
-# Rebuild solo el servicio UI para aplicar cambios
+# Rebuild only the UI service to apply changes
 docker-compose up -d --build ui
 
-# O rebuild completo si prefieres
+# Or rebuild the entire service if you prefer
 docker-compose up -d --build
 ```
 
-> **💡 Tip**: Si usas HTTPS para el servidor, asegúrate de tener certificados SSL válidos configurados para evitar problemas de conexión WebSocket.
+> **💡 Tip**: If you're using HTTPS for the server, make sure you have valid SSL certificates configured to avoid WebSocket connection issues.
 
-### Variables de entorno
+### Environment Variables
 
-Crea un archivo `.env` en la raíz del proyecto:
+Create a `.env` file in the project root:
 
 ```env
-# Base de datos
+# Database
 DATABASE_URL=postgresql://wplace:wplace123@postgres:5432/wplace_master
 
 # Redis
 REDIS_URL=redis://redis:6379
 
-# SSL (solo para producción)
+# SSL (production only)
 SSL_CERT_PATH=/app/certs/fullchain.pem
 SSL_KEY_PATH=/app/certs/privkey.pem
 
-# Configuración del servidor
+# Server Configuration
 PYTHONUNBUFFERED=1
 ```
 
-> **Nota**: La configuración del servidor remoto (`SERVER_URL`) se realiza directamente en `docker-compose.yml`, no mediante variables de entorno.
+> **Note**: The remote server configuration (`SERVER_URL`) is done directly in `docker-compose.yml`, not via environment variables.
 
-### Personalización de puertos
+### Port Customization
 
-Modifica el <mcfile name="docker-compose.yml" path="/Users/alvaroalonso/workspace/project-place/wplace-masterserver/docker-compose.yml"></mcfile> según tus necesidades:
+Modify the <mcfile name="docker-compose.yml" path="/Users/alvaroalonso/workspace/project-place/wplace-masterserver/docker-compose.yml"></mcfile> to suit your needs:
 
 ```yaml
 services:
-  server:
-    ports:
-      - "8008:8000"  # Puerto actual del servidor
-  ui:
-    ports:
-      - "3004:3000"  # Puerto actual de la interfaz web
-  postgres:
-    ports:
-      - "5432:5432"  # Puerto de PostgreSQL
-  redis:
-    ports:
-      - "6379:6379"  # Puerto de Redis
+server:
+ports:
+- "8008:8000" # Current server port
+ui:
+ports:
+- "3004:3000" # Current web interface port
+postgres:
+ports:
+- "5432:5432" # PostgreSQL port
+redis:
+ports:
+- "6379:6379" # Redis port
 ```
 
 ---
 
-## 📖 Uso del sistema
+## 📖 Using the System
 
-### 1. Conectar bots esclavos
+### 1. Connecting Slave Bots
 
-Los bots se conectan automáticamente al master server mediante WebSocket:
+Bots automatically connect to the master server via WebSocket:
 
 ```
-ws://tu-servidor:8008/ws/slave/{slave_id}
+ws://your-server:8008/ws/slave/{slave_id}
 ```
 
-### 2. Configurar proyectos
+### 2. Configure Projects
 
-Desde la interfaz web puedes:
-- Crear proyectos de tipo **Image** o **Guard**
-- Subir imágenes para conversión automática a pixel art
-- Definir áreas de protección para el modo Guard
-- Asignar bots específicos a cada proyecto
+From the web interface you can:
+- Create **Image** or **Guard** type projects
+- Upload images for automatic conversion to pixel art
+- Define protection areas for Guard mode
+- Assign specific bots to each project
 
-### 3. Monitorear actividad
+### 3. Monitor Activity
 
-El panel de control muestra:
-- Estado de conexión de cada bot
-- Progreso de proyectos activos
-- Estadísticas de rendimiento
-- Logs en tiempo real
+The dashboard displays:
+- Connection status of each bot
+- Progress of active projects
+- Performance statistics
+- Real-time logs
 
 ---
 
-## 🛠️ Uso
+## 🛠️ Usage
 
-### Iniciar el sistema
+### Start the system
 
 ```bash
-# Método recomendado: usar el script de inicio
+# Recommended method: Use the startup script
 ./start.sh
 
-# Para desarrollo frontend únicamente
+# For frontend development only
 ./start.sh --frontend-only
 
-# Método manual con Docker Compose
+# Manual method with Docker Compose
 docker-compose up -d
 ```
 
-### Detener el sistema
+### Stop the system
 
 ```bash
-# Detener todos los servicios
+# Stop all services
 docker-compose down
 
-# Detener y eliminar volúmenes (⚠️ elimina datos de BD)
+# Stop and delete volumes (⚠️ deletes database data)
 docker-compose down -v
 ```
 
-### Ver logs
+### View logs
 
 ```bash
-# Logs de todos los servicios
+# Logs for all services
 docker-compose logs -f
 
-# Logs de un servicio específico
-docker-compose logs -f server  # FastAPI
-docker-compose logs -f ui      # Interfaz web
-docker-compose logs -f postgres # Base de datos
-docker-compose logs -f redis   # Cache
+# Logs for a specific service
+docker-compose logs -f server # FastAPI
+docker-compose logs -f ui # Web interface
+docker-compose logs -f postgres # Database
+docker-compose logs -f redis # Cache
 ```
 
 ---
 
-## 🏗️ Desarrollo
+## 🏗️ Development
 
-### Ejecutar en modo desarrollo
+### Run in development mode
 
 ```bash
 # Backend (FastAPI)
@@ -429,81 +428,81 @@ npm install
 npm run dev
 ```
 
-### Estructura del proyecto
+### Project structure
 
 ```
 wplace-masterserver/
-├── server/                 # Backend FastAPI
-│   ├── main.py            # Aplicación principal
-│   ├── requirements.txt   # Dependencias Python
-│   └── Dockerfile         # Imagen Docker del servidor
-├── ui/                    # Frontend Astro/React
-│   ├── src/               # Código fuente
-│   ├── package.json       # Dependencias Node.js
-│   └── Dockerfile         # Imagen Docker de la UI
-├── docker-compose.yml     # Orquestación de servicios
-├── despliegue.sh         # Script de despliegue automatizado
-└── README.md             # Este archivo
+├── server/ # Backend FastAPI
+│ ├── main.py # Main application
+│ ├── requirements.txt # Python dependencies
+│ └── Dockerfile # Server Docker image
+├── ui/ # Astro/React frontend
+│ ├── src/ # Source code
+│ ├── package.json # Node.js dependencies
+│ └── Dockerfile # UI Docker image
+├── docker-compose.yml # Service orchestration
+├── deployment.sh # Automated deployment script
+└── README.md # This file
 ```
 
 ---
 
-## 🤝 Proyectos relacionados
+## 🤝 Projects Related
 
-Este servidor está diseñado para trabajar con:
+This server is designed to work with:
 
-- **[WPlace AutoBOT](https://github.com/Alarisco/WPlace-AutoBOTV2-GuardBOT)**: Bots cliente que se conectan al master server <mcreference link="https://github.com/Alarisco/WPlace-AutoBOTV2-GuardBOT" index="1">1</mcreference>
+- **[WPlace AutoBOT](https://github.com/Alarisco/WPlace-AutoBOTV2-GuardBOT)**: Client bots connecting to the master server <mcreference link="https://github.com/Alarisco/WPlace-AutoBOTV2-GuardBOT" index="1">1</mcreference>
 
 ---
 
-## 🐛 Solución de problemas
+## 🐛 Troubleshooting
 
-### Error de conexión WebSocket
+### WebSocket connection error
 
 ```bash
-# Verificar que el servidor esté ejecutándose
+# Verify that the server is running
 docker-compose ps
 
-# Ver logs del servidor
+# View server logs
 docker-compose logs server
 ```
 
-### Problemas con certificados SSL
+### SSL certificate problems
 
 ```bash
-# Verificar permisos de certificados
-ls -la /etc/letsencrypt/live/tu-dominio.com/
+# Verify certificate permissions
+ls -la /etc/letsencrypt/live/your-domain.com/
 
-# Renovar certificados Let's Encrypt
+# Renew Let's Encrypt certificates
 sudo certbot renew
 ```
 
-### Base de datos no inicializa
+### Base Data not initialized
 
 ```bash
-# Limpiar volúmenes y reiniciar
+# Clean volumes and reboot
 docker-compose down -v
 docker-compose up -d
 ```
 
 ---
 
-## 📄 Licencia
+## 📄 License
 
-Este proyecto está bajo la Licencia MIT. Ver el archivo `LICENSE` para más detalles.
+This project is licensed under the MIT License. See the `LICENSE` file for details.
 
-## ☕ Apoyo al desarrollo
+## ☕ Development Support
 
-Si este proyecto te ha sido útil, considera apoyar su desarrollo:
+If you found this project helpful, please consider supporting its development:
 
 <p align="center">
-  <a href="https://buymeacoffee.com/alarisco">
-    <img src="https://img.shields.io/badge/Buy%20Me%20A%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me A Coffee">
-  </a>
+<a href="https://buymeacoffee.com/alarisco">
+<img src="https://img.shields.io/badge/Buy%20Me%20A%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me A Coffee">
+</a>
 </p>
 
 ---
 
 <p align="center">
-  <strong>🎨 Hecho con ❤️ para la comunidad de WPlace – usa responsablemente</strong>
+<strong>🎨 Made with ❤️ for the WPlace community – use responsibly</strong>
 </p>
